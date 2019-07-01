@@ -104,10 +104,21 @@ const View = require('kappa-view-query')
 
 Expects a LevelUP or LevelDOWN instance `leveldb`.
 
+```js
+// returns a source to be used by pull-stream
+core.api.query.read(opts)
+
+// returns information about index performance
+core.api.query.explain(opts)
+
+// append an index onto existing set
+core.api.query.add(opts)
+```
+
 ## Install
 
 ```bash
-$ npm install kappa-view-query 
+$ npm install kappa-view-query
 ```
 
 ## Acknowledgments 

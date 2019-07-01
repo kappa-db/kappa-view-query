@@ -4,7 +4,6 @@ const pull = require('pull-stream')
 const get = require('lodash.get')
 const memdb = require('memdb')
 const charwise = require('charwise')
-
 const FlumeViewQuery = require('flumeview-query/inject')
 const many = require('pull-many')
 
@@ -22,66 +21,47 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
   } = opts
 
 
-  indexes = indexes.map((idx) => {
-    return {
-      key: idx.key,
-      value: idx.value,
-      exact: 'boolean' === typeof idx.exact ? idx.exact : false,
-      createStream: function (_opts) {
-        _opts.keyEncoding = charwise
-        _opts.lte.unshift(idx.key)
-        _opts.gte.unshift(idx.key)
-        _opts.keys = true
-        _opts.values = true
+  indexes = indexes.map((idx) => ({
+    key: idx.key,
+    value: idx.value,
+    exact: 'boolean' === typeof idx.exact ? idx.exact : false,
+    createStream: (_opts) => {
+      _opts.lte.unshift(idx.key)
+      _opts.gte.unshift(idx.key)
 
-        return pull(
-          toPull(db.createReadStream(_opts)),
-          pull.asyncMap((msg, next) => {
-            var id = msg.value
-            var feed = core._logs.feed(id.split('@')[0])
-            var seq = Number(id.split('@')[1])
-            feed.get(seq, function (err, value) {
-              if (err) return next(err)
+      Object.assign(_opts, {
+        keyEncoding: charwise,
+        keys: true,
+        values: true
+      })
 
-              next(null, {
-                key: feed.key.toString('hex'),
-                seq,
-                value
-              })
+      return pull(
+        toPull(db.createReadStream(_opts)),
+        pull.asyncMap((msg, next) => {
+          var [ feedId, sequence ] = msg.value.split('@')
+          var feed = core._logs.feed(feedId)
+          var seq = Number(sequence)
+
+          feed.get(seq, (err, value) => {
+            if (err) return next(err)
+
+            next(null, {
+              key: feed.key.toString('hex'),
+              seq,
+              value
             })
           })
-        )
-      }
-    }
-  })
-
-  function source (_opts) {
-    var source = defer.source()
-
-    core.ready(function () {
-      source.resolve(
-        pull(
-          many(
-            core.feeds().map((feed) => {
-              return pull(
-                toPull(feed.createReadStream(_opts)),
-                pull.map((data) => ({ value: data }))
-              )
-            })
-          )
-        )
+        })
       )
-    })
-
-    return source
-  }
+    }
+  }))
 
   var query = FlumeViewQuery({ stream: source }, indexes)
 
   var view = {
     maxBatch: opts.maxBatch || 100,
 
-    map: function (msgs, next) {
+    map: (msgs, next) => {
       const ops = []
 
       msgs.forEach((msg) => {
@@ -93,12 +73,9 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
           if (Array.isArray(idx.value[0])) {
             var msgValues = idx.value
-              .map(a => a.join('.'))
-              .map(v => {
-                var t = get(msg, v)
-                if (typeof t === 'number') return t.toString()
-                else return t
-              })
+              .map((keys) => keys.join('.'))
+              .map((key) => get(msg, key))
+              .map((value) => typeof value === 'number' ? value.toString() : value)
               .filter(Boolean)
 
             if (msgValues.length === idx.value.length) {
@@ -128,9 +105,30 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
     },
     api: {
       read: (core, _opts) => query.read(_opts),
-      explain: (core, _opts) => query.explain(_opts)
+      explain: (core, _opts) => query.explain(_opts),
+      add: (core, _opts) => query.add(_opts)
     }
   }
+
+  function source (_opts) {
+    var source = defer.source()
+    core.ready(() => {
+      source.resolve(
+        pull(
+          many(
+            core.feeds().map((feed) => (
+              pull(
+                toPull(feed.createReadStream(_opts)),
+                pull.map((value) => ({ value }))
+              )
+            ))
+          )
+        )
+      )
+    })
+    return source
+  }
+
   return view
 }
 
