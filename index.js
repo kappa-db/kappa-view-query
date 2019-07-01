@@ -1,18 +1,26 @@
-const MFR = require('map-filter-reduce')
 const toPull = require('stream-to-pull-stream')
 const defer = require('pull-defer')
 const pull = require('pull-stream')
 const get = require('lodash.get')
 const memdb = require('memdb')
 const charwise = require('charwise')
+
 const FlumeViewQuery = require('flumeview-query/inject')
 const many = require('pull-many')
 
 module.exports = function KappaViewQuery (db, core, opts = {}) {
   var {
     indexes = [],
-    db = memdb()
+    db = memdb(),
+    validator = function (msg) {
+      if (typeof msg !== 'object') return null
+      if (typeof msg.value !== 'object') return null
+      if (typeof msg.value.timestamp !== 'number') return null
+      if (typeof msg.value.type !== 'string') return null
+      return msg
+    }
   } = opts
+
 
   indexes = indexes.map((idx) => {
     return {
@@ -20,19 +28,18 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
       value: idx.value,
       exact: 'boolean' === typeof idx.exact ? idx.exact : false,
       createStream: function (_opts) {
+        _opts.keyEncoding = charwise
         _opts.lte.unshift(idx.key)
         _opts.gte.unshift(idx.key)
         _opts.keys = true
         _opts.values = true
 
-        console.log("CRRETE STREAM")
         return pull(
           toPull(db.createReadStream(_opts)),
           pull.asyncMap((msg, next) => {
-            console.log("MESSAGE: ", msg)
             var id = msg.value
-            var feed = core._logs.feed(id.split('@')[1])
-            var seq = Number(id.split('@')[2])
+            var feed = core._logs.feed(id.split('@')[0])
+            var seq = Number(id.split('@')[1])
             feed.get(seq, function (err, value) {
               if (err) return next(err)
 
@@ -61,8 +68,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
                 pull.map((data) => ({ value: data }))
               )
             })
-          ),
-          pull.through(console.log)
+          )
         )
       )
     })
@@ -77,19 +83,16 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
     map: function (msgs, next) {
       const ops = []
-      var pending = msgs.length
 
       msgs.forEach((msg) => {
-        --pending
-        if (!sanitize(msg)) return
+        if (!validator(msg)) return
 
         indexes.forEach((idx) => {
           var values = []
           var found = false
-          var accessor = idx.value
 
-          if (Array.isArray(accessor[0])) {
-            var msgValues = accessor
+          if (Array.isArray(idx.value[0])) {
+            var msgValues = idx.value
               .map(a => a.join('.'))
               .map(v => {
                 var t = get(msg, v)
@@ -98,63 +101,36 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
               })
               .filter(Boolean)
 
-            if (msgValues.length === accessor.length) {
-              values = msgValues
+            if (msgValues.length === idx.value.length) {
+              values = [idx.key, ...msgValues]
               found = true
             }
           } else {
-            accessor = accessor.join('.')
-            value = get(msg, accessor)
-
+            var value = get(msg, idx.value.join('.'))
             if (value) {
-              values = [value]
+              values = [idx.key, value]
               found = true
             }
           }
 
-          if (found && values.length > 0) {
-            ++pending
-
-            // use charwise for key.
-            // set key encoding using charwise.
-
-            db.get(idx.key, function (err) {
-              if (err && err.notFound) {
-                ops.push({
-                  type: 'put',
-                  key: values,
-                  value: `${idx.key}@${msg.key}@${msg.seq}`,
-                  keyEncoding: charwise,
-                })
-              }
-
-              if (!--pending) done()
+          if (found && values.length > 1) {
+            ops.push({
+              type: 'put',
+              key: values,
+              value: `${msg.key}@${msg.seq}`,
+              keyEncoding: charwise,
             })
           }
         })
       })
 
-      if (!pending) done()
-
-      function done () {
-        db.batch(ops, next)
-      }
+      db.batch(ops, next)
     },
     api: {
-      source: (core, _opts) => source(_opts),
-      read: (core, _opts) => {
-        return query.read(_opts)
-      },
-      explain: query.explain
+      read: (core, _opts) => query.read(_opts),
+      explain: (core, _opts) => query.explain(_opts)
     }
   }
   return view
 }
 
-function sanitize (msg) {
-  if (typeof msg !== 'object') return null
-  if (typeof msg.value !== 'object') return null
-  if (typeof msg.value.timestamp !== 'number') return null
-  if (typeof msg.value.type !== 'string') return null
-  return msg
-}
