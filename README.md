@@ -35,49 +35,51 @@ core.ready(function () {
     // append messages to feed in the 'wrong' order
     const data = [{
       type: 'chat/message',
-      timestamp: Date.now(),
+      timestamp: 1561996331739,
       content: { body: 'First message' } 
     }, {
       type: 'user/about',
-      timestamp: Date.now(),
+      timestamp: 1561996331739,
       content: { name: 'Grace' }
     }, {
     }, {
       type: 'chat/message',
-      timestamp: Date.now() + 2,
+      timestamp: 1561996331741,
       content: { body: 'Third message' } 
     }, {
       type: 'chat/message',
-      timestamp: Date.now() + 1,
+      timestamp: 1561996331740,
       content: { body: 'Second message' } 
     }, {
       type: 'user/about',
-      timestamp: Date.now(),
+      timestamp: 1561996331754,
       content: { name: 'Poison Ivy' }
     }]
 
     feed.append(data)
   })
 
-  // use the second index ('typ') that was passed when initialising the view to
   // get all messages of type 'chat/message', and order by timestamp
   const query = [{ $filter: { value: { type: 'chat/message' } } }]
 
   pull(
+    // the view will use flumeview-query's scoring system to choose 
+    // the most relevant index, in this case, the second index – 'typ'
     core.api.query.read({ live: true, reverse: true, query }),
     pull.collect((err, msgs) => {
       console.log(msgs)
+      // returns a list of messages filtered by type then ordered by timestamp 
       // [{
       //   type: 'chat/message',
-      //   timestamp: Date.now(),
+      //   timestamp: 1561996331739,
       //   content: { body: 'First message' } 
       // }, {
       //   type: 'chat/message',
-      //   timestamp: ...,
+      //   timestamp: 1561996331740,
       //   content: { body: 'Second message' } 
       // }, {
       //   type: 'chat/message',
-      //   timestamp: ...,
+      //   timestamp: 1561996331741,
       //   content: { body: 'Third message' } 
       // }]
     })
