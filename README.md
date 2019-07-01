@@ -75,24 +75,25 @@ core.ready(function () {
     // the view will use flumeview-query's scoring system to choose 
     // the most relevant index, in this case, the second index – 'typ'
     core.api.query.read({ live: true, reverse: true, query }),
-    pull.collect((err, msgs) => {
-      console.log(msgs)
-      // returns a list of messages filtered by type then ordered by timestamp 
-      // [{
-      //   type: 'chat/message',
-      //   timestamp: 1561996331739,
-      //   content: { body: 'First message' } 
-      // }, {
-      //   type: 'chat/message',
-      //   timestamp: 1561996331740,
-      //   content: { body: 'Second message' } 
-      // }, {
-      //   type: 'chat/message',
-      //   timestamp: 1561996331741,
-      //   content: { body: 'Third message' } 
-      // }]
+    pull.drain((msg) => {
+      console.log(msg)
     })
   )
+
+  // logs each message filtered by type then ordered by timestamp 
+  // [{
+  //   type: 'chat/message',
+  //   timestamp: 1561996331739,
+  //   content: { body: 'First message' } 
+  // }, {
+  //   type: 'chat/message',
+  //   timestamp: 1561996331740,
+  //   content: { body: 'Second message' } 
+  // }, {
+  //   type: 'chat/message',
+  //   timestamp: 1561996331741,
+  //   content: { body: 'Third message' } 
+  // }]
 })
 ```
 
