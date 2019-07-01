@@ -1,12 +1,5 @@
-# Kappa View Query
-
-> provides a querying interface for custom indexes – inspired by [ssb-query](https://github.com/ssbc/ssb-query) which uses [map-filter-reduce](https://github.com/dominictarr/map-filter-reduce) and [flumeview-query](https://github.com/flumedb/flumeview-query) – as a kappa-core materialised view.
-
-## Usage
-
-```js
 const kappa = require('kappa-core')
-const Query = require('kappa-view-query')
+const Query = require('./')
 const ram = require('random-access-memory')
 
 const memdb = require('memdb')
@@ -75,7 +68,9 @@ core.ready(() => {
     // the view will use flumeview-query's scoring system to choose 
     // the most relevant index, in this case, the second index – 'typ'
     core.api.query.read({ live: true, reverse: true, query }),
-    pull.drain(console.log)
+    pull.drain((msg) => {
+      console.log(msg)
+    })
   )
 
   // logs each message filtered by type then ordered by timestamp 
@@ -105,38 +100,5 @@ core.ready(() => {
   //       content: { body: 'First message'  }
   //   }
   // }
+
 })
-```
-
-## API
-
-```
-const View = require('kappa-view-query') 
-```
-
-Expects a LevelUP or LevelDOWN instance `leveldb`.
-
-```js
-// returns a source to be used by pull-stream
-core.api.query.read(opts)
-
-// returns information about index performance
-core.api.query.explain(opts)
-
-// append an index onto existing set
-core.api.query.add(opts)
-```
-
-## Install
-
-```bash
-$ npm install kappa-view-query
-```
-
-## Acknowledgments 
-kappa-view-query was inspired by flumeview-query and programmed by [@kieran](https://github.com/KGibb8/) and [@dominictarr](https://github.com/dominictarr).
-
-## TODO
-
-* Remove need for `core` to be passed as an argument, instead access from within the view itself, which should be available from kappa-core after being plugged in
-* Inherit test suite from flumeview-query

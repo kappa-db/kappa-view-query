@@ -7,8 +7,8 @@ module.exports = function (name, tests, memory) {
   const core = kappa(ram, { valueEncoding: 'json' })
   core.use('query', Query(memdb, core, { indexes: tests.indexes }))
 
-  core.ready(function () {
-    core.writer('local', function (err, feed) {
+  core.ready(() => {
+    core.writer('local', (err, feed) => {
       tests(feed.append, core.api.query.read, (cb) => cb())
     })
   })
