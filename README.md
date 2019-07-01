@@ -1,12 +1,12 @@
 # Kappa View Query
 
-> provides a querying interface for custom indexes – using [map-filter-reduce](https://github.com/dominictarr/map-filter-reduce) and [flumeview-query](https://github.com/flumedb/flumeview-query) – as a kappa-core materialised view.
+> provides a querying interface for custom indexes – inspired by [ssb-query](https://github.com/ssbc/ssb-query) which uses [map-filter-reduce](https://github.com/dominictarr/map-filter-reduce) and [flumeview-query](https://github.com/flumedb/flumeview-query) – as a kappa-core materialised view.
 
 ## Usage
 
 ```js
 const kappa = require('kappa-core')
-const View = require('kappa-view-query')
+const Query = require('kappa-view-query')
 const ram = require('random-access-memory')
 
 const memdb = require('memdb')
@@ -20,7 +20,16 @@ const core = kappa(ram, { valueEncoding: 'json'  })
 // write indexes to a leveldb instance stored as files 
 const db = memdb() || level('/tmp/db')
 
-// example indexes, brought over from ssb-query 
+// custom validator enabling you to write your own message schemas
+const validator = function (msg) {
+  if (typeof msg !== 'object') return null
+  if (typeof msg.value !== 'object') return null
+  if (typeof msg.value.timestamp !== 'number') return null
+  if (typeof msg.value.type !== 'string') return null
+  return msg
+}
+
+// some example indexes, ported over from ssb-query
 const indexes = [
   // indexes all messages from all feeds by timestamp 
   { key: 'log', value: ['value', 'timestamp'] },
@@ -28,7 +37,7 @@ const indexes = [
   { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }
 ] 
 
-core.use('query', View(db, core, { indexes })) 
+core.use('query', Query(db, core, { indexes, validator })) 
 
 core.ready(function () {
   core.writer(function (err, feed) => {
@@ -103,3 +112,8 @@ $ npm install kappa-view-query
 
 ## Acknowledgments 
 kappa-view-query was inspired by flumeview-query and programmed by [@kieran](https://github.com/KGibb8/) and [@dominictarr](https://github.com/dominictarr).
+
+## TODO
+
+* Remove need for `core` to be passed as an argument, instead access from within the view itself, which should be available from kappa-core after being plugged in
+* Inherit test suite from flumeview-query
