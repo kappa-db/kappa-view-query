@@ -79,8 +79,8 @@ core.ready(() => {
   //   seq: 3,
   //   value: {
   //     type: 'chat/message',
-  //       timestamp: 1561996331741,
-  //       content: { body: 'Third message'  }
+  //     timestamp: 1561996331741,
+  //     content: { body: 'Third message'  }
   //   }
   // }
   // {
@@ -88,16 +88,17 @@ core.ready(() => {
   //   seq: 4,
   //   value: {
   //     type: 'chat/message',
-  //       timestamp: 1561996331740,
-  //       content: { body: 'Second message'  }
+  //     timestamp: 1561996331740,
+  //     content: { body: 'Second message'  }
   //   }
   // }
   // {
   //   key: 'd20dff5a33bbd35596bf355ece0142af2e81aebf192dcbccbc672b964fb374d7',
   //   seq: 0,
-  //   value: { type: 'chat/message',
-  //       timestamp: 1561996331739,
-  //       content: { body: 'First message'  }
+  //   value: {
+  //     type: 'chat/message',
+  //     timestamp: 1561996331739,
+  //     content: { body: 'First message'  }
   //   }
   // }
 
