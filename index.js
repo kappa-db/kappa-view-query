@@ -11,13 +11,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
   var {
     indexes = [],
     db = memdb(),
-    validator = function (msg) {
-      if (typeof msg !== 'object') return null
-      if (typeof msg.value !== 'object') return null
-      if (typeof msg.value.timestamp !== 'number') return null
-      if (typeof msg.value.type !== 'string') return null
-      return msg
-    }
+    validator = (msg) => msg
   } = opts
 
 
@@ -25,20 +19,18 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
     key: idx.key,
     value: idx.value,
     exact: 'boolean' === typeof idx.exact ? idx.exact : false,
-    createStream: (_opts) => {
-      _opts.lte.unshift(idx.key)
-      _opts.gte.unshift(idx.key)
-
-      Object.assign(_opts, {
-        keyEncoding: charwise,
-        keys: true,
-        values: true
-      })
-
-      return pull(
-        toPull(db.createReadStream(_opts)),
+    createStream: (_opts) => (
+      pull(
+        toPull(db.createReadStream(Object.assign(_opts, {
+          lte: [idx.key, ..._opts.lte],
+          gte: [idx.key, ..._opts.gte],
+          keyEncoding: charwise,
+          keys: true,
+          values: true
+        }))),
         pull.asyncMap((msg, next) => {
-          var [ feedId, sequence ] = msg.value.split('@')
+          var msgId = msg.value
+          var [ feedId, sequence ] = msgId.split('@')
           var feed = core._logs.feed(feedId)
           var seq = Number(sequence)
 
@@ -53,7 +45,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
           })
         })
       )
-    }
+    )
   }))
 
   var query = FlumeViewQuery({ stream: source }, indexes)
@@ -66,37 +58,31 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
       msgs.forEach((msg) => {
         if (!validator(msg)) return
+        var msgId = `${msg.key}@${msg.seq}`
 
         indexes.forEach((idx) => {
-          var values = []
-          var found = false
+          var indexKeys = getIndexValues(msg, idx.value)
 
-          if (Array.isArray(idx.value[0])) {
-            var msgValues = idx.value
-              .map((keys) => keys.join('.'))
-              .map((key) => get(msg, key))
-              .map((value) => typeof value === 'number' ? value.toString() : value)
-              .filter(Boolean)
-
-            if (msgValues.length === idx.value.length) {
-              values = [idx.key, ...msgValues]
-              found = true
-            }
-          } else {
-            var value = get(msg, idx.value.join('.'))
-            if (value) {
-              values = [idx.key, value]
-              found = true
-            }
-          }
-
-          if (found && values.length > 1) {
+          if (indexKeys.length) {
             ops.push({
               type: 'put',
-              key: values,
-              value: `${msg.key}@${msg.seq}`,
+              key: [idx.key, ...indexKeys],
+              value: msgId,
               keyEncoding: charwise,
             })
+          }
+
+          function getIndexValues (msg, value) {
+            var child = value[0]
+            if (Array.isArray(child)) {
+              return value
+                .map((val) => getIndexValues(msg, val))
+                .reduce((acc, arr) => [...acc, ...arr], [])
+                .filter(Boolean)
+            } else if (typeof child === 'string') {
+              return [value.reduce((obj, val) => obj[val], msg)]
+                .filter(Boolean)
+            } else return []
           }
         })
       })
