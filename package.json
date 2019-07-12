@@ -9,6 +9,7 @@
   "dependencies": {
     "charwise": "^3.0.1",
     "defer": "^1.0.0",
+    "events": "^3.0.0",
     "flumeview-query": "^7.2.0",
     "lodash.get": "^4.4.2",
     "pull-many": "^1.0.9",

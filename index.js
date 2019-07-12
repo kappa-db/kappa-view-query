@@ -6,8 +6,10 @@ const memdb = require('memdb')
 const charwise = require('charwise')
 const FlumeViewQuery = require('flumeview-query/inject')
 const many = require('pull-many')
+const { EventEmitter } = require('events')
 
 module.exports = function KappaViewQuery (db, core, opts = {}) {
+  var events = new EventEmitter()
   var {
     indexes = [],
     db = memdb(),
@@ -89,11 +91,15 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
       db.batch(ops, next)
     },
+    indexed: (msgs) => {
+      msgs.forEach((msg) => events.emit('insert', msg))
+    },
     api: {
       read: (core, _opts) => query.read(_opts),
       explain: (core, _opts) => query.explain(_opts),
-      add: (core, _opts) => query.add(_opts)
-    }
+      add: (core, _opts) => query.add(_opts),
+      events
+    },
   }
 
   function source (_opts) {
