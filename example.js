@@ -25,7 +25,7 @@ const indexes = [
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
 ]
 
-core.use('query', Query(db, core, { indexes, validator })) 
+core.use('query', Query(db, core, { indexes, validator }))
 
 core.ready(() => {
   core.writer('local', (err, feed) => {
@@ -61,8 +61,8 @@ core.ready(() => {
 
   const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
-  pull(
-    core.api.query.read({ live: true, query }),
-    pull.drain(console.log)
-  )
+  // TODO: this won't work, as its live!!
+  collect(core.api.query.read({ live: true, query }), (err, msgs) => {
+
+  })
 })
