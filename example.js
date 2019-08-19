@@ -61,8 +61,13 @@ core.ready(() => {
 
   const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
-  // TODO: this won't work, as its live!!
-  collect(core.api.query.read({ live: true, query }), (err, msgs) => {
+  // For live queries
+  core.api.query.read({ live: true, query }).on('data', (err, msg) => {
+    // Do stuff with each message
+  })
 
+  // For static queries
+  collect(core.api.query.read({ query }), (err, msgs) => {
+    // Do stuff with the collection
   })
 })
