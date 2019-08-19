@@ -1,20 +1,24 @@
-const toPull = require('stream-to-pull-stream')
-const through = require('through2')
 const delay = require('delayed-stream')
 const merge = require('merge-stream')
+const through = require('through2')
 const memdb = require('memdb')
 const charwise = require('charwise')
-const FlumeViewQuery = require('flumeview-query/inject')
 const { EventEmitter } = require('events')
+const debug = require('debug')('kappa-view-query')
+
+const Explain = require('./explain')
+const Filter = require('./filter')
+
+const { isFunction } = require('./util')
 
 module.exports = function KappaViewQuery (db, core, opts = {}) {
   var events = new EventEmitter()
+
   var {
     indexes = [],
     db = memdb(),
     validator = (msg) => msg
   } = opts
-
 
   indexes = indexes.map((idx) => ({
     key: idx.key,
@@ -43,10 +47,10 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
       })
 
       stream.pipe(thru)
+
+      return thru
     }
   }))
-
-  var query = FlumeViewQuery({ stream: source }, indexes)
 
   var view = {
     maxBatch: opts.maxBatch || 100,
@@ -91,33 +95,42 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
       msgs.forEach((msg) => events.emit('insert', msg))
     },
     api: {
-      read: (core, _opts) => query.read(_opts),
-      explain: (core, _opts) => query.explain(_opts),
-      add: (core, _opts) => query.add(_opts),
+      read: (core, _opts) => {
+        var __opts = view.api.explain(_opts)
+        var source = __opts.createStream(__opts)
+        return Filter(source, _opts)
+      },
+      explain: Explain(indexes, (core, _opts) => {
+        var delayed
+
+        _opts.seqs = false
+        _opts.values = true
+
+        core.ready(() => {
+          var feeds = core.feeds().reduce((acc, feed) => {
+            var stream = feed.createReadStream(_opts)
+            var thru = through.obj(function (value, enc, next) {
+              this.push({ value })
+              next()
+            })
+            stream.pipe(thru)
+            acc.push(thru)
+            return acc
+          })
+
+          delayed = delay.create(merge(feeds))
+        })
+
+        return delayed
+      }),
+      add: (core, _opts) => {
+        var isValid = _opts && isFunction(_opts.createStream) && Array.isArray(_opts.index || _opts.value)
+        if(!isValid) throw new Error('kappa-view-query.add: expected opts { index, createStream }')
+        _opts.value = _opts.index || _opts.value
+        indexes.push(_opts)
+      },
       events
     }
-  }
-
-  function source (_opts) {
-    // TODO: check if this is the correct way to use this?
-    var delayed
-
-    core.ready(() => {
-      var feeds = core.feeds().reduce((acc, feed) => {
-        var stream = feed.createReadStream(_opts)
-        var thru = through.obj(function (value, enc, next) {
-          this.push({ value })
-          next()
-        })
-        stream.pipe(thru)
-        acc.push(thru)
-        return acc
-      })
-
-      delayed = delay.create(merge(feeds))
-    })
-
-    return delayed
   }
 
   return view
