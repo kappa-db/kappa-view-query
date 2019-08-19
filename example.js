@@ -1,23 +1,16 @@
 const kappa = require('kappa-core')
-const Query = require('./')
 const ram = require('random-access-memory')
-
+const collect = require('collect-stream')
 const memdb = require('memdb')
 const level = require('level')
-
 const pull = require('pull-stream')
+
+const Query = require('./')
+const { validator } = require('./util')
 
 const core = kappa(ram, { valueEncoding: 'json'  })
 
 const db = memdb() || level('/tmp/db')
-
-function validator (msg) {
-  if (typeof msg !== 'object') return null
-  if (typeof msg.value !== 'object') return null
-  if (typeof msg.value.timestamp !== 'number') return null
-  if (typeof msg.value.type !== 'string') return null
-  return msg
-}
 
 const indexes = [
   { key: 'log', value: ['value', 'timestamp'] },
@@ -62,12 +55,13 @@ core.ready(() => {
   const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
   // For live queries
-  core.api.query.read({ live: true, query }).on('data', (err, msg) => {
-    // Do stuff with each message
+  core.api.query.read({ live: true, query }).on('data', (msg) => {
+    console.log(msg)
   })
 
   // For static queries
   collect(core.api.query.read({ query }), (err, msgs) => {
-    // Do stuff with the collection
+    if (err) return console.error(err)
+    console.log(err, msgs)
   })
 })

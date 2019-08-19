@@ -42,10 +42,19 @@ function isFunction (variable) {
   return typeof variable === 'function'
 }
 
+function validator (msg) {
+  if (typeof msg !== 'object') return null
+  if (typeof msg.value !== 'object') return null
+  if (typeof msg.value.timestamp !== 'number') return null
+  if (typeof msg.value.type !== 'string') return null
+  return msg
+}
+
 module.exports = {
   has,
   get,
   set,
   findByPath,
-  isFunction
+  isFunction,
+  validator
 }

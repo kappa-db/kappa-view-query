@@ -2,6 +2,7 @@ const rimraf = require('rimraf')
 const debug = require('debug')('kappa-view-query')
 const tmpdir = require('tmp').dirSync
 const mkdirp = require('mkdirp')
+const path = require('path')
 
 function cleanup (dirs, cb) {
   if (!cb) cb = noop
@@ -33,10 +34,10 @@ function cleanup (dirs, cb) {
 }
 
 function tmp () {
-  var path = tmpdir().name
-  mkdirp.sync(path)
-  debug(`[TEMP] creating temp directory ${path}`)
-  return path
+  var tmpDir = path.resolve(__dirname, tmpdir().name)
+  mkdirp.sync(tmpDir)
+  debug(`[TEMP] creating temp directory ${tmpDir}`)
+  return tmpDir
 }
 
 function uniq (array) {
@@ -44,6 +45,12 @@ function uniq (array) {
   return Array.from(new Set(array))
 }
 
+function replicate (core1, core2, cb) {
+  var stream = core1.replicate()
+  stream.pipe(core2.replicate()).pipe(stream)
+  stream.on('end', cb)
+}
+
 function noop () {}
 
-module.exports = { cleanup, tmp, uniq }
+module.exports = { cleanup, tmp, uniq, replicate, noop }

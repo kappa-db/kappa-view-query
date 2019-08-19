@@ -25,6 +25,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
     value: idx.value,
     exact: 'boolean' === typeof idx.exact ? idx.exact : false,
     createStream: (_opts) => {
+      debug(`[INDEX] initialising ${idx.key}: indexing on ${idx.value}`)
       var stream = db.createReadStream(Object.assign(_opts, {
         lte: [idx.key, ..._opts.lte],
         gte: [idx.key, ..._opts.gte],
@@ -41,7 +42,12 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
         feed.get(seq, (err, value) => {
           if (err) return next()
-          this.push({ key: feed.key.toString('hex'), seq, value })
+          debug(`[INDEX] indexing: feed ID ${feedId} sequence ${seq} message: ${JSON.stringify(value)}`)
+          this.push({
+            key: feed.key.toString('hex'),
+            seq,
+            value
+          })
           next()
         })
       })
@@ -60,7 +66,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
       msgs.forEach((msg) => {
         if (!validator(msg)) return
-        var msgId = `${msg.key}@${msg.seq}`
+        var msgId = [msg.key, msg.seq].join('@')
 
         indexes.forEach((idx) => {
           var indexKeys = getIndexValues(msg, idx.value)
@@ -98,6 +104,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
       read: (core, _opts) => {
         var __opts = view.api.explain(_opts)
         var source = __opts.createStream(__opts)
+        debug(`[QUERY] ${JSON.stringify(_opts.query)}`)
         return Filter(source, _opts)
       },
       explain: Explain(indexes, (core, _opts) => {
@@ -129,7 +136,7 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
         _opts.value = _opts.index || _opts.value
         indexes.push(_opts)
       },
-      onInsert: (core, cb) => {
+      onUpdate: (core, cb) => {
         events.on('update', cb)
       },
       events
