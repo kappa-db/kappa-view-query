@@ -129,6 +129,9 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
         _opts.value = _opts.index || _opts.value
         indexes.push(_opts)
       },
+      onInsert: (core, cb) => {
+        events.on('update', cb)
+      },
       events
     }
   }
