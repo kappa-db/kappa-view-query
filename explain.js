@@ -5,6 +5,7 @@ const { findByPath } = require('./util')
 module.exports = function Explain (indexes) {
   return function explain (opts = {}) {
     var query, sort
+
     if (Array.isArray(opts.query)) {
       query = opts.query[0].$filter || {}
       sort = opts.query[opts.query.length-1].$sort
@@ -23,7 +24,6 @@ module.exports = function Explain (indexes) {
     _opts.old = (opts.old !== false)
     _opts.live = (opts.live === true || opts.old === false)
     _opts.createStream = index.createStream
-    _opts.sync = opts.sync
     _opts.index = index.key,
     _opts.scores = r.scores
 

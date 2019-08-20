@@ -6,6 +6,7 @@ const memdb = require('memdb')
 const level = require('level')
 const collect = require('collect-stream')
 const crypto = require('crypto')
+const debug = require('debug')('kappa-view-query')
 
 const { cleanup, tmp, replicate } = require('./util')
 
@@ -21,7 +22,7 @@ describe('basic', (context) => {
       { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
     ]
 
-    core.use('query', Query(db, core, { indexes }))
+    core.use('query', Query(db, { indexes }))
   })
 
   context('perform a query', (assert, next) => {
@@ -33,7 +34,6 @@ describe('basic', (context) => {
       type: 'user/about',
       timestamp: Date.now(),
       content: { name: 'Grace' }
-    }, {
     }, {
       type: 'chat/message',
       timestamp: Date.now() + 3,
@@ -83,11 +83,11 @@ describe('multiple feeds', (context) => {
     name1 = crypto.randomBytes(16).toString('hex')
     name2 = crypto.randomBytes(16).toString('hex')
 
-    core.use('query', Query(db, core, { indexes }))
+    core.use('query', Query(db, { indexes }))
   })
 
   context.afterEach((c) => {
-    // cleanup([storage])
+    cleanup([storage])
   })
 
   context('aggregates all valid messages from all feeds when querying', (assert, next) => {
@@ -97,15 +97,16 @@ describe('multiple feeds', (context) => {
     core.ready(() => {
       setup(name1, (feed1) => {
         setup(name2, (feed2) => {
-          assert.same(core.feeds().length, 2, 'two local feeds')
+          debug(`initialised feed1: ${feed1.key.toString('hex')} feed2: ${feed2.key.toString('hex')}`)
+          assert.same(2, core.feeds().length, 'two local feeds')
 
           collect(core.api.query.read({ live: false, query }), (err, msgs) => {
             assert.error(err, 'no error')
             assert.ok(msgs.length === 2, 'returns two messages')
-            assert.same(msgs.map((msg) => msg.value), [
-              { type: 'chat/message', timestamp, author: feed1.key.toString('base64') },
-              { type: 'chat/message', timestamp, author: feed2.key.toString('base64') }
-            ], 'replicated and aggregated')
+            assert.same([
+              { type: 'chat/message', timestamp, author: feed1.key.toString('hex') },
+              { type: 'chat/message', timestamp, author: feed2.key.toString('hex') }
+            ], msgs.map((msg) => msg.value), 'replicated and aggregated')
             next()
           })
         })
@@ -118,7 +119,7 @@ describe('multiple feeds', (context) => {
         feed.append({
           type: 'chat/message',
           timestamp,
-          author: feed.key.toString('base64')
+          author: feed.key.toString('hex')
         }, (err, seq) => {
           assert.error(err, 'no error')
           cb(feed)
@@ -139,17 +140,15 @@ describe('multiple cores', (context) => {
     core2 = kappa(storage2, { valueEncoding: 'json' })
     db1 = level(`${storage1}/views`)  // memdb()
     db2 = level(`${storage2}/views`)  // memdb()
-    // db1 = memdb()
-    // db2 = memdb()
 
     indexes = [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }]
 
-    core1.use('query', Query(db1, core1, { indexes }))
-    core2.use('query', Query(db2, core2, { indexes }))
+    core1.use('query', Query(db1, { indexes }))
+    core2.use('query', Query(db2, { indexes }))
   })
 
   context.afterEach((c) => {
-    // cleanup([storage1, storage2])
+    cleanup([storage1, storage2])
   })
 
   context('aggregates all valid messages from all feeds when querying', (assert, next) => {
@@ -158,6 +157,7 @@ describe('multiple cores', (context) => {
 
     setup(core1, (feed1) => {
       setup(core2, (feed2) => {
+        debug(`initialised core1: ${feed1.key.toString('hex')} core2: ${feed2.key.toString('hex')}`)
         collect(core1.api.query.read({ live: false, query }), (err, msgs) => {
           assert.error(err, 'no error')
           assert.ok(msgs.length === 1, 'returns a single message')
@@ -168,10 +168,10 @@ describe('multiple cores', (context) => {
             collect(core2.api.query.read({ live: false, query }), (err, msgs) => {
               assert.error(err, 'no error')
               assert.ok(msgs.length === 2, 'returns two messages')
-              assert.same(msgs.map((msg) => msg.value), [
-                { type: 'chat/message', timestamp, author: feed1.key.toString('base64') },
-                { type: 'chat/message', timestamp, author: feed2.key.toString('base64') }
-              ], 'replicated and aggregated')
+              assert.same([
+                { type: 'chat/message', timestamp, author: feed1.key.toString('hex') },
+                { type: 'chat/message', timestamp, author: feed2.key.toString('hex') }
+              ], msgs.map((msg) => msg.value), 'replicated and aggregated')
               next()
             })
           })
@@ -186,7 +186,7 @@ describe('multiple cores', (context) => {
           feed.append({
             type: 'chat/message',
             timestamp,
-            author: feed.key.toString('base64')
+            author: feed.key.toString('hex')
           }, (err, seq) => {
             assert.error(err, 'no error')
             cb(feed)

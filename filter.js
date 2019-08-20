@@ -4,7 +4,7 @@ const MFR = require('map-filter-reduce')
 const pull = require('pull-stream')
 
 // In order to use map-filter-reduce (MFR),
-// we need to use it as a pull through stream
+// we need to use pull-stream
 
 module.exports = function Filter(source, opts = {}) {
   return toStream(

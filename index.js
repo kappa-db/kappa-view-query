@@ -11,7 +11,7 @@ const Filter = require('./filter')
 
 const { isFunction } = require('./util')
 
-module.exports = function KappaViewQuery (db, core, opts = {}) {
+module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
   var events = new EventEmitter()
 
   var {
@@ -19,43 +19,8 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
     validator = (msg) => msg
   } = opts
 
-  db = db ? db : memdb()
-
-  indexes = indexes.map((idx) => ({
-    key: idx.key,
-    value: idx.value,
+  indexes = indexes.map((idx) => Object.assign(idx, {
     exact: typeof idx.exact === 'boolean' ? idx.exact : false,
-    createStream: (_opts) => {
-      var thru = through.obj(function (msg, enc, next) {
-        var msgId = msg.value
-        var [ feedId, sequence ] = msgId.split('@')
-        var feed = core._logs.feed(feedId)
-        var seq = Number(sequence)
-
-        debug(`[INDEX] indexing: feed ID ${feedId} sequence ${seq}`)
-
-        feed.get(seq, (err, value) => {
-          if (err) return next()
-          debug(`[QUERY] got message ${JSON.stringify(value)}`)
-          this.push({
-            key: feed.key.toString('hex'),
-            seq,
-            value
-          })
-          next()
-        })
-      })
-
-      db.createReadStream(Object.assign(_opts, {
-        lte: [idx.key, ..._opts.lte],
-        gte: [idx.key, ..._opts.gte],
-        keyEncoding: charwise,
-        keys: true,
-        values: true
-      })).pipe(thru)
-
-      return thru
-    }
   }))
 
   var view = {
@@ -63,6 +28,8 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
     map: (msgs, next) => {
       const ops = []
+
+      debug(`[TO INDEX] ${JSON.stringify(msgs)}`)
 
       msgs.forEach((msg) => {
         if (!validator(msg)) return
@@ -95,19 +62,54 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
         })
       })
 
+      debug(`[INDEXING] ${JSON.stringify(ops)}`)
+
       db.batch(ops, next)
     },
     indexed: (msgs) => {
-      msgs.forEach((msg) => events.emit('insert', msg))
+      msgs.forEach((msg) => events.emit('update', msg))
     },
     api: {
       read: (core, _opts) => {
-        debug(`[QUERY] ${JSON.stringify(_opts.query)}`)
         var __opts = view.api.explain(core, _opts)
         var source = __opts.createStream(__opts)
         return Filter(source, _opts)
       },
-      explain: (core, _opts) => Explain(indexes)(_opts),
+      explain: (core, _opts) => {
+        var explain = Explain(indexes.map((idx) => Object.assign(idx, {
+          createStream: (__opts) => {
+            var thru = through.obj(function (msg, enc, next) {
+              var msgId = msg.value
+              var [ feedId, sequence ] = msgId.split('@')
+              var feed = core._logs.feed(feedId)
+              var seq = Number(sequence)
+
+              feed.get(seq, (err, value) => {
+                if (err) return next()
+                debug(`[THROUGH] found message ${JSON.stringify(value)}`)
+                this.push({
+                  key: feed.key.toString('hex'),
+                  seq,
+                  value
+                })
+                next()
+              })
+            })
+
+            db.createReadStream(Object.assign(__opts, {
+              lte: [idx.key, ...__opts.lte],
+              gte: [idx.key, ...__opts.gte],
+              keyEncoding: charwise,
+              keys: true,
+              values: true
+            })).pipe(thru)
+
+            return thru
+          }
+        })))
+
+        return explain(_opts)
+      },
       add: (core, _opts) => {
         var isValid = _opts && isFunction(_opts.createStream) && Array.isArray(_opts.index || _opts.value)
         if(!isValid) throw new Error('kappa-view-query.add: expected opts { index, createStream }')

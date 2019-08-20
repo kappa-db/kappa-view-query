@@ -20,7 +20,7 @@ const indexes = [
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
 ]
 
-core.use('query', Query(db, core, { indexes, validator }))
+core.use('query', Query(db, { indexes, validator }))
 
 core.ready(() => {
   core.writer('local', (err, feed) => {
