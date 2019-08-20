@@ -3,6 +3,7 @@ const kappa = require('kappa-core')
 const Query = require('../')
 const ram = require('random-access-memory')
 const memdb = require('memdb')
+const level = require('level')
 const collect = require('collect-stream')
 const crypto = require('crypto')
 
@@ -75,32 +76,35 @@ describe('multiple feeds', (context) => {
   context.beforeEach((c) => {
     storage = tmp()
     core = kappa(storage, { valueEncoding: 'json'  })
-    db = memdb()
+    db = level(`${storage}/views`)  // memdb()
 
     indexes = [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }]
 
-    name1 = crypto.randomBytes().toString('hex')
-    name2 = crypto.randomBytes().toString('hex')
+    name1 = crypto.randomBytes(16).toString('hex')
+    name2 = crypto.randomBytes(16).toString('hex')
 
     core.use('query', Query(db, core, { indexes }))
   })
 
   context.afterEach((c) => {
-    cleanup([storage1])
+    // cleanup([storage])
   })
 
   context('aggregates all valid messages from all feeds when querying', (assert, next) => {
     let query = [{ $filter: { value: { type: 'chat/message' } } }]
+    let timestamp = Date.now()
 
     core.ready(() => {
       setup(name1, (feed1) => {
         setup(name2, (feed2) => {
+          assert.same(core.feeds().length, 2, 'two local feeds')
+
           collect(core.api.query.read({ live: false, query }), (err, msgs) => {
             assert.error(err, 'no error')
             assert.ok(msgs.length === 2, 'returns two messages')
             assert.same(msgs.map((msg) => msg.value), [
-              { type: 'chat/message', author: feed1.key.toString('base64') },
-              { type: 'chat/message', author: feed2.key.toString('base64') }
+              { type: 'chat/message', timestamp, author: feed1.key.toString('base64') },
+              { type: 'chat/message', timestamp, author: feed2.key.toString('base64') }
             ], 'replicated and aggregated')
             next()
           })
@@ -113,7 +117,7 @@ describe('multiple feeds', (context) => {
         assert.error(err, 'no error')
         feed.append({
           type: 'chat/message',
-          timestamp: Date.now(),
+          timestamp,
           author: feed.key.toString('base64')
         }, (err, seq) => {
           assert.error(err, 'no error')
@@ -133,8 +137,10 @@ describe('multiple cores', (context) => {
     storage2 = tmp()
     core1 = kappa(storage1, { valueEncoding: 'json' })
     core2 = kappa(storage2, { valueEncoding: 'json' })
-    db1 = memdb()
-    db2 = memdb()
+    db1 = level(`${storage1}/views`)  // memdb()
+    db2 = level(`${storage2}/views`)  // memdb()
+    // db1 = memdb()
+    // db2 = memdb()
 
     indexes = [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }]
 
@@ -143,7 +149,7 @@ describe('multiple cores', (context) => {
   })
 
   context.afterEach((c) => {
-    cleanup([storage1, storage2])
+    // cleanup([storage1, storage2])
   })
 
   context('aggregates all valid messages from all feeds when querying', (assert, next) => {

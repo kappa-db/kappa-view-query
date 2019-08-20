@@ -7,10 +7,12 @@ const pull = require('pull-stream')
 
 const Query = require('./')
 const { validator } = require('./util')
+const { cleaup, tmp } = require('./test/util')
 
-const core = kappa(ram, { valueEncoding: 'json'  })
-
-const db = memdb() || level('/tmp/db')
+const _core = tmp()
+const _db = tmp()
+const core = kappa(_core, { valueEncoding: 'json'  })
+const db = level(_db)
 
 const indexes = [
   { key: 'log', value: ['value', 'timestamp'] },
@@ -30,7 +32,6 @@ core.ready(() => {
       type: 'user/about',
       timestamp: 1561996331740,
       content: { name: 'Grace' }
-    }, {
     }, {
       type: 'chat/message',
       timestamp: 1561996331742,
@@ -54,14 +55,14 @@ core.ready(() => {
 
   const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
-  // For live queries
-  core.api.query.read({ live: true, query }).on('data', (msg) => {
-    console.log(msg)
-  })
-
   // For static queries
   collect(core.api.query.read({ query }), (err, msgs) => {
     if (err) return console.error(err)
     console.log(err, msgs)
+  })
+
+  // For live queries
+  core.api.query.read({ live: true, query }).on('data', (msg) => {
+    console.log(msg)
   })
 })

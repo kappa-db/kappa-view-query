@@ -16,33 +16,27 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
 
   var {
     indexes = [],
-    db = memdb(),
     validator = (msg) => msg
   } = opts
+
+  db = db ? db : memdb()
 
   indexes = indexes.map((idx) => ({
     key: idx.key,
     value: idx.value,
-    exact: 'boolean' === typeof idx.exact ? idx.exact : false,
+    exact: typeof idx.exact === 'boolean' ? idx.exact : false,
     createStream: (_opts) => {
-      debug(`[INDEX] initialising ${idx.key}: indexing on ${idx.value}`)
-      var stream = db.createReadStream(Object.assign(_opts, {
-        lte: [idx.key, ..._opts.lte],
-        gte: [idx.key, ..._opts.gte],
-        keyEncoding: charwise,
-        keys: true,
-        values: true
-      }))
-
       var thru = through.obj(function (msg, enc, next) {
         var msgId = msg.value
         var [ feedId, sequence ] = msgId.split('@')
         var feed = core._logs.feed(feedId)
         var seq = Number(sequence)
 
+        debug(`[INDEX] indexing: feed ID ${feedId} sequence ${seq}`)
+
         feed.get(seq, (err, value) => {
           if (err) return next()
-          debug(`[INDEX] indexing: feed ID ${feedId} sequence ${seq} message: ${JSON.stringify(value)}`)
+          debug(`[QUERY] got message ${JSON.stringify(value)}`)
           this.push({
             key: feed.key.toString('hex'),
             seq,
@@ -52,7 +46,13 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
         })
       })
 
-      stream.pipe(thru)
+      db.createReadStream(Object.assign(_opts, {
+        lte: [idx.key, ..._opts.lte],
+        gte: [idx.key, ..._opts.gte],
+        keyEncoding: charwise,
+        keys: true,
+        values: true
+      })).pipe(thru)
 
       return thru
     }
@@ -102,34 +102,12 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
     },
     api: {
       read: (core, _opts) => {
-        var __opts = view.api.explain(_opts)
-        var source = __opts.createStream(__opts)
         debug(`[QUERY] ${JSON.stringify(_opts.query)}`)
+        var __opts = view.api.explain(core, _opts)
+        var source = __opts.createStream(__opts)
         return Filter(source, _opts)
       },
-      explain: Explain(indexes, (core, _opts) => {
-        var delayed
-
-        _opts.seqs = false
-        _opts.values = true
-
-        core.ready(() => {
-          var feeds = core.feeds().reduce((acc, feed) => {
-            var stream = feed.createReadStream(_opts)
-            var thru = through.obj(function (value, enc, next) {
-              this.push({ value })
-              next()
-            })
-            stream.pipe(thru)
-            acc.push(thru)
-            return acc
-          })
-
-          delayed = delay.create(merge(feeds))
-        })
-
-        return delayed
-      }),
+      explain: (core, _opts) => Explain(indexes)(_opts),
       add: (core, _opts) => {
         var isValid = _opts && isFunction(_opts.createStream) && Array.isArray(_opts.index || _opts.value)
         if(!isValid) throw new Error('kappa-view-query.add: expected opts { index, createStream }')
@@ -139,10 +117,20 @@ module.exports = function KappaViewQuery (db, core, opts = {}) {
       onUpdate: (core, cb) => {
         events.on('update', cb)
       },
+      storeState: (state, cb) => {
+        state = state.toString('base64')
+        db.put('state', state, cb)
+      },
+      fetchState: (cb) => {
+        db.get('state', function (err, state) {
+          if (err && err.notFound) cb()
+          else if (err) cb(err)
+          else cb(null, Buffer.from(state, 'base64'))
+        })
+      },
       events
     }
   }
 
   return view
 }
-

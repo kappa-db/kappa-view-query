@@ -34,7 +34,7 @@ function cleanup (dirs, cb) {
 }
 
 function tmp () {
-  var tmpDir = path.resolve(__dirname, tmpdir().name)
+  var tmpDir = `./${tmpdir().name}`
   mkdirp.sync(tmpDir)
   debug(`[TEMP] creating temp directory ${tmpDir}`)
   return tmpDir
@@ -46,6 +46,7 @@ function uniq (array) {
 }
 
 function replicate (core1, core2, cb) {
+  debug(`[REPLICATE] replicating...`)
   var stream = core1.replicate()
   stream.pipe(core2.replicate()).pipe(stream)
   stream.on('end', cb)
