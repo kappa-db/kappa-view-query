@@ -1,6 +1,6 @@
 # Kappa View Query
 
-> provides a querying interface for custom indexes – inspired by [ssb-query](https://github.com/ssbc/ssb-query) which uses [map-filter-reduce](https://github.com/dominictarr/map-filter-reduce) and [flumeview-query](https://github.com/flumedb/flumeview-query) – as a kappa-core materialised view.
+> provides a querying interface to act on hypercores – inspired by [ssb-query](https://github.com/ssbc/ssb-query) which uses [map-filter-reduce](https://github.com/dominictarr/map-filter-reduce) and [flumeview-query](https://github.com/flumedb/flumeview-query) – as a kappa-core materialised view.
 
 ## Usage
 
@@ -15,7 +15,6 @@ const level = require('level')
 const pull = require('pull-stream')
 
 const core = kappa(ram, { valueEncoding: 'json'  })
-
 const db = memdb() || level('/tmp/db')
 
 function validator (msg) {
@@ -32,7 +31,7 @@ const indexes = [
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
 ]
 
-core.use('query', Query(db, core, { indexes, validator }))
+core.use('query', Query(db, { indexes, validator }))
 
 core.ready(() => {
   core.writer('local', (err, feed) => {
@@ -110,7 +109,7 @@ core.ready(() => {
 
 ## API
 
-```
+```js
 const View = require('kappa-view-query') 
 ```
 
@@ -133,10 +132,5 @@ core.api.query.add(opts)
 $ npm install kappa-view-query
 ```
 
-## Acknowledgments 
-kappa-view-query was inspired by flumeview-query and programmed by [@kieran](https://github.com/KGibb8/) and [@dominictarr](https://github.com/dominictarr).
-
-## TODO
-
-* Remove need for `core` to be passed as an argument, instead access from within the view itself, which should be available from kappa-core after being plugged in
-* Inherit test suite from flumeview-query
+## Acknowledgments
+kappa-view-query was inspired by flumeview-query and programmed by [@kyphae](https://github.com/kyphae/) and [@dominictarr](https://github.com/dominictarr).

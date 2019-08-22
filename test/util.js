@@ -34,7 +34,7 @@ function cleanup (dirs, cb) {
 }
 
 function tmp () {
-  var tmpDir = tmpdir().name
+  var tmpDir = `./${tmpdir().name}`
   mkdirp.sync(tmpDir)
   debug(`[TEMP] creating temp directory ${tmpDir}`)
   return tmpDir

@@ -1,5 +1,3 @@
-const delay = require('delayed-stream')
-const merge = require('merge-stream')
 const through = require('through2')
 const memdb = require('memdb')
 const charwise = require('charwise')
@@ -12,28 +10,24 @@ const Filter = require('./filter')
 const { isFunction } = require('./util')
 
 module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
-  var events = new EventEmitter()
+  const events = new EventEmitter()
 
-  var {
+  const {
     indexes = [],
-    validator = (msg) => msg
+    validator = (msg) => msg,
+    keyEncoding = charwise
   } = opts
 
-  indexes = indexes.map((idx) => Object.assign(idx, {
-    exact: typeof idx.exact === 'boolean' ? idx.exact : false,
-  }))
-
-  var view = {
+  const view = {
     maxBatch: opts.maxBatch || 100,
 
     map: (msgs, next) => {
-      const ops = []
+      var ops = []
 
       debug(`[TO INDEX] ${JSON.stringify(msgs)}`)
 
       msgs.forEach((msg) => {
         if (!validator(msg)) return
-        var msgId = [msg.key, msg.seq].join('@')
 
         indexes.forEach((idx) => {
           var indexKeys = getIndexValues(msg, idx.value)
@@ -42,8 +36,8 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
             ops.push({
               type: 'put',
               key: [idx.key, ...indexKeys],
-              value: msgId,
-              keyEncoding: charwise,
+              value: [msg.key, msg.seq].join('@'),
+              keyEncoding,
             })
           }
 
@@ -77,6 +71,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
       },
       explain: (core, _opts) => {
         var explain = Explain(indexes.map((idx) => Object.assign(idx, {
+          exact: typeof idx.exact === 'boolean' ? idx.exact : false,
           createStream: (__opts) => {
             var thru = through.obj(function (msg, enc, next) {
               var msgId = msg.value
@@ -99,7 +94,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
             db.createReadStream(Object.assign(__opts, {
               lte: [idx.key, ...__opts.lte],
               gte: [idx.key, ...__opts.gte],
-              keyEncoding: charwise,
+              keyEncoding,
               keys: true,
               values: true
             })).pipe(thru)

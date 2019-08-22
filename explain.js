@@ -1,6 +1,7 @@
 const Query = require('./query')
 const Select = require('./select')
 const { findByPath } = require('./util')
+const debug = require('debug')('kappa-view-query')
 
 module.exports = function Explain (indexes) {
   return function explain (opts = {}) {
@@ -30,4 +31,3 @@ module.exports = function Explain (indexes) {
     return _opts
   }
 }
-
