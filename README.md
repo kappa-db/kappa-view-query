@@ -33,77 +33,49 @@ const indexes = [
 
 core.use('query', Query(db, { indexes, validator }))
 
-core.ready(() => {
-  core.writer('local', (err, feed) => {
-    const data = [{
-      type: 'chat/message',
-      timestamp: 1561996331739,
-      content: { body: 'First message' }
-    }, {
-      type: 'user/about',
-      timestamp: 1561996331740,
-      content: { name: 'Grace' }
-    }, {
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331742,
-      content: { body: 'Third message' }
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331743,
-      content: { channel: 'dogs', body: 'Lurchers rule' }
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331741,
-      content: { body: 'Second message' }
-    }, {
-      type: 'user/about',
-      timestamp: 1561996331754,
-      content: { name: 'Poison Ivy' }
-    }]
+core.writer('local', (err, feed) => {
+  const data = [{
+    type: 'chat/message',
+    timestamp: 1561996331739,
+    content: { body: 'First message' }
+  }, {
+    type: 'user/about',
+    timestamp: 1561996331740,
+    content: { name: 'Grace' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331742,
+    content: { body: 'Third message' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331743,
+    content: { channel: 'dogs', body: 'Lurchers rule' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331741,
+    content: { body: 'Second message' }
+  }, {
+    type: 'user/about',
+    timestamp: 1561996331754,
+    content: { name: 'Poison Ivy' }
+  }]
 
-    feed.append(data)
+  feed.append(data, (err, seq) => {
+    const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
+    core.ready('query', () => {
+      // For static queries
+      collect(core.api.query.read({ query }), (err, msgs) => {
+        console.log(msgs)
+
+        // Logs all messages in the dogs channel...
+        // {
+        //   type: 'chat/message',
+        //   timestamp: 1561996331743,
+        //   content: { channel: 'dogs', body: 'Lurchers rule' }
+        // }
+      })
+    })
   })
-
-  const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
-
-  // For live queries
-  core.api.query.read({ live: true, query }).on('data', (err, msg) => {
-    // Do stuff with each message
-  })
-
-  // For static queries
-  collect(core.api.query.read({ query }), (err, msgs) => {
-    // Do stuff with the collection
-  })
-
-  // logs each message filtered by type then ordered by timestamp 
-  // {
-  //   key: 'd20dff5a33bbd35596bf355ece0142af2e81aebf192dcbccbc672b964fb374d7',
-  //   seq: 3,
-  //   value: {
-  //     type: 'chat/message',
-  //       timestamp: 1561996331741,
-  //       content: { body: 'Third message'  }
-  //   }
-  // }
-  // {
-  //   key: 'd20dff5a33bbd35596bf355ece0142af2e81aebf192dcbccbc672b964fb374d7',
-  //   seq: 4,
-  //   value: {
-  //     type: 'chat/message',
-  //       timestamp: 1561996331740,
-  //       content: { body: 'Second message'  }
-  //   }
-  // }
-  // {
-  //   key: 'd20dff5a33bbd35596bf355ece0142af2e81aebf192dcbccbc672b964fb374d7',
-  //   seq: 0,
-  //   value: { type: 'chat/message',
-  //       timestamp: 1561996331739,
-  //       content: { body: 'First message'  }
-  //   }
-  // }
 })
 ```
 

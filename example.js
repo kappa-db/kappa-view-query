@@ -9,10 +9,8 @@ const Query = require('./')
 const { validator } = require('./util')
 const { cleaup, tmp } = require('./test/util')
 
-const _core = tmp()
-const _db = tmp()
-const core = kappa(_core, { valueEncoding: 'json'  })
-const db = level(_db)
+const core = kappa(ram, { valueEncoding: 'json' })
+const db = memdb()
 
 const indexes = [
   { key: 'log', value: ['value', 'timestamp'] },
@@ -22,47 +20,41 @@ const indexes = [
 
 core.use('query', Query(db, { indexes, validator }))
 
-core.ready(() => {
-  core.writer('local', (err, feed) => {
-    const data = [{
-      type: 'chat/message',
-      timestamp: 1561996331739,
-      content: { body: 'First message' }
-    }, {
-      type: 'user/about',
-      timestamp: 1561996331740,
-      content: { name: 'Grace' }
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331742,
-      content: { body: 'Third message' }
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331743,
-      content: { channel: 'dogs', body: 'Lurchers rule' }
-    }, {
-      type: 'chat/message',
-      timestamp: 1561996331741,
-      content: { body: 'Second message' }
-    }, {
-      type: 'user/about',
-      timestamp: 1561996331754,
-      content: { name: 'Poison Ivy' }
-    }]
+core.writer('local', (err, feed) => {
+  const data = [{
+    type: 'chat/message',
+    timestamp: 1561996331739,
+    content: { body: 'First message' }
+  }, {
+    type: 'user/about',
+    timestamp: 1561996331740,
+    content: { name: 'Grace' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331742,
+    content: { body: 'Third message' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331743,
+    content: { channel: 'dogs', body: 'Lurchers rule' }
+  }, {
+    type: 'chat/message',
+    timestamp: 1561996331741,
+    content: { body: 'Second message' }
+  }, {
+    type: 'user/about',
+    timestamp: 1561996331754,
+    content: { name: 'Poison Ivy' }
+  }]
 
-    feed.append(data)
-  })
+  feed.append(data, (err, seq) => {
+    core.ready('query', () => {
+      const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
-  const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
-
-  // For static queries
-  collect(core.api.query.read({ query }), (err, msgs) => {
-    if (err) return console.error(err)
-    console.log(err, msgs)
-  })
-
-  // For live queries
-  core.api.query.read({ live: true, query }).on('data', (msg) => {
-    console.log(msg)
+      collect(core.api.query.read({ query }), (err, msgs) => {
+        if (err) return console.error(err)
+        console.log(err, msgs)
+      })
+    })
   })
 })
