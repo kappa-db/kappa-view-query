@@ -2,8 +2,6 @@ const kappa = require('kappa-core')
 const ram = require('random-access-memory')
 const collect = require('collect-stream')
 const memdb = require('memdb')
-const level = require('level')
-const pull = require('pull-stream')
 
 const Query = require('./')
 const { validator } = require('./util')
@@ -23,37 +21,42 @@ core.use('query', Query(db, { indexes, validator }))
 core.writer('local', (err, feed) => {
   const data = [{
     type: 'chat/message',
-    timestamp: 1561996331739,
-    content: { body: 'First message' }
+    timestamp: Date.now(),
+    content: { body: 'Hi im new here...' }
   }, {
     type: 'user/about',
-    timestamp: 1561996331740,
+    timestamp: Date.now() + 1,
     content: { name: 'Grace' }
   }, {
     type: 'chat/message',
-    timestamp: 1561996331742,
-    content: { body: 'Third message' }
+    timestamp: Date.now() + 2,
+    content: { body: 'Second post' }
   }, {
     type: 'chat/message',
-    timestamp: 1561996331743,
+    timestamp: Date.now() + 3,
     content: { channel: 'dogs', body: 'Lurchers rule' }
   }, {
     type: 'chat/message',
-    timestamp: 1561996331741,
-    content: { body: 'Second message' }
+    timestamp: Date.now() + 4,
+    content: { channel: 'dogs', body: 'But sometimes I prefer labra-doodles' }
   }, {
     type: 'user/about',
-    timestamp: 1561996331754,
+    timestamp: Date.now() + 5,
     content: { name: 'Poison Ivy' }
   }]
 
-  feed.append(data, (err, seq) => {
+  feed.append(data, (err, _) => {
     core.ready('query', () => {
       const query = [{ $filter: { value: { type: 'chat/message', content: { channel: 'dogs' } } } }]
 
-      collect(core.api.query.read({ query }), (err, msgs) => {
+      collect(core.api.query.read({ query }), (err, chats) => {
         if (err) return console.error(err)
-        console.log(err, msgs)
+        console.log(chats)
+
+        collect(core.api.query.read({ query: [{ $filter: { value: { type: 'user/about' } } }] }), (err, users) => {
+          if (err) return console.error(err)
+          console.log(users)
+        })
       })
     })
   })

@@ -24,8 +24,6 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
     map: (msgs, next) => {
       var ops = []
 
-      debug(`[TO INDEX] ${JSON.stringify(msgs)}`)
-
       msgs.forEach((msg) => {
         if (!validator(msg)) return
 
@@ -81,7 +79,6 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
 
               feed.get(seq, (err, value) => {
                 if (err) return next()
-                debug(`[THROUGH] found message ${JSON.stringify(value)}`)
                 this.push({
                   key: feed.key.toString('hex'),
                   seq,
