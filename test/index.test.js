@@ -96,9 +96,9 @@ describe('multiple feeds', (context) => {
           collect(core.api.query.read({ query }), (err, msgs) => {
             assert.error(err, 'no error')
             assert.ok(msgs.length === 2, 'returns two messages')
-            assert.same(msgs.map((msg) => msg.value), [
-              { type: 'chat/message', timestamp, author: feed1.key.toString('hex'), content: { body: name1 } },
-              { type: 'chat/message', timestamp: timestamp + 1, author: feed2.key.toString('hex'), content: { body: name2 } }
+            assert.same(msgs, [
+              { key: feed1.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp, content: { body: name1 } } },
+              { key: feed2.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp: timestamp + 1, content: { body: name2 } }}
             ], 'aggregates all feeds')
             next()
           })
@@ -112,7 +112,6 @@ describe('multiple feeds', (context) => {
         feed.append({
           type: 'chat/message',
           timestamp: timestamp + count,
-          author: feed.key.toString('hex'),
           content: { body: name }
         }, (err, seq) => {
           assert.error(err, 'no error')
@@ -163,9 +162,9 @@ describe('multiple cores', (context) => {
                 collect(core2.api.query.read({ query }), (err, msgs) => {
                   assert.error(err, 'no error')
                   assert.ok(msgs.length === 2, 'returns two messages')
-                  assert.same(msgs.map((msg) => msg.value), [
-                    { type: 'chat/message', timestamp, author: feed1.key.toString('hex') },
-                    { type: 'chat/message', timestamp: timestamp + 1, author: feed2.key.toString('hex') }
+                  assert.same(msgs, [
+                    { key: feed1.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp } },
+                    { key: feed2.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp: timestamp + 1 } }
                   ], 'query aggregates messages from all feeds')
                   next()
                 })
@@ -181,8 +180,7 @@ describe('multiple cores', (context) => {
         assert.error(err, 'no error')
         feed.append({
           type: 'chat/message',
-          timestamp: timestamp + count,
-          author: feed.key.toString('hex')
+          timestamp: timestamp + count
         }, (err, seq) => {
           count++
           assert.error(err, 'no error')
