@@ -159,3 +159,6 @@ $ npm install kappa-view-query
 
 ## Acknowledgments
 kappa-view-query was built by [@kyphae](https://github.com/kyphae/) and assisted by [@dominictarr](https://github.com/dominictarr). It uses [@dominictarr](https://github.com/dominictarr)'s scoring system and query interface.
+
+## Version Changes
+Version 2 - Updated to remove `pull-stream` and `flumeview-query` as a core dependency for better compatibility with the rest of the `kappa-db` ecosystem. `api.query.read` now returns a regular readable node stream. In order to continue to use pull-streams, check out an updated fork of V1: [kappa-view-pull-query](https://github.com/kappa-db/kappa-view-pull-query)
