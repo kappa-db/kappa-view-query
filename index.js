@@ -25,7 +25,8 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
       var ops = []
 
       msgs.forEach((msg) => {
-        if (!validator(msg)) return
+        msg = validator(msg)
+        if (!msg) return
 
         indexes.forEach((idx) => {
           var indexKeys = getIndexValues(msg, idx.value)
