@@ -80,22 +80,22 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
 
               feed.get(seq, (err, value) => {
                 if (err) return next()
-                this.push({
-                  key: feed.key.toString('hex'),
-                  seq,
-                  value
-                })
+                var msg = validator({ key: feed.key.toString('hex'), seq, value })
+                if (!msg) return next()
+                this.push(msg)
                 next()
               })
             })
 
-            db.createReadStream(Object.assign(__opts, {
+            var stream = db.createReadStream(Object.assign(__opts, {
               lte: [idx.key, ...__opts.lte],
               gte: [idx.key, ...__opts.gte],
               keyEncoding,
               keys: true,
               values: true
-            })).pipe(thru)
+            }))
+
+            stream.pipe(thru)
 
             return thru
           }

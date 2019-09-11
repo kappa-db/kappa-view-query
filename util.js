@@ -13,10 +13,10 @@ function has (key, obj) {
 }
 
 function get (key, obj) {
-  if('string' === typeof key) return obj[key]
-  for(var i in key) {
+  if ('string' === typeof key) return obj[key]
+  for (var i in key) {
     obj = obj[key[i]]
-    if(!obj) return obj
+    if (!obj) return obj
   }
   return obj
 }
