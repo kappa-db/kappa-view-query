@@ -60,12 +60,21 @@ const memdb = require('memdb')
 const core = kappa(ram, { valueEncoding: 'json'  })
 const db = memdb()
 
-// Define a validator to determine if a message should be indexed or not
+// Define a validator or a message decoder to determine if a message should be indexed or not
 function validator (msg) {
   if (typeof msg !== 'object') return null
   if (typeof msg.value !== 'object') return null
   if (typeof msg.value.timestamp !== 'number') return null
   if (typeof msg.value.type !== 'string') return null
+  return msg
+}
+
+// here's an alternative using protocol buffers, assuming a message schema exists
+const { Message } = protobuf(fs.readFileSync(path.join(path.resolve(__dirname), 'message.proto')))
+
+function validator (msg) {
+  try { msg.value = Message.decode(msg.value) }
+  catch (err) { return console.error(err) && false }
   return msg
 }
 
