@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "nyc tape test/**/*.test.js | tap-spec"
+    "test": "tape test/**/*.test.js | tap-spec",
+    "cover": "nyc tape test/**/*.test.js | tap-spec"
   },
   "dependencies": {
     "charwise": "^3.0.1",

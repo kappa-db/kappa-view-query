@@ -7,17 +7,16 @@ const path = require('path')
 function cleanup (dirs, cb) {
   if (!cb) cb = noop
   if (!Array.isArray(dirs)) dirs = [dirs]
-
-  var pending = dirs.length
+  var pending = 1
 
   function next (n) {
     var dir = dirs[n]
-    if (!dir) return
+    if (!dir) return done()
+    ++pending
+    process.nextTick(next, n + 1)
 
     rimraf(dir, (err) => {
-      debug(`[CLEANUP] ${dir} : ${ err ? 'failed' : 'success'}`)
       if (err) return done(err)
-      process.nextTick(next, n + 1)
       done()
     })
   }
@@ -34,9 +33,8 @@ function cleanup (dirs, cb) {
 }
 
 function tmp () {
-  var tmpDir = `./${tmpdir().name}`
+  var tmpDir = tmpdir().name
   mkdirp.sync(tmpDir)
-  debug(`[TEMP] creating temp directory ${tmpDir}`)
   return tmpDir
 }
 
@@ -46,7 +44,6 @@ function uniq (array) {
 }
 
 function replicate (core1, core2, cb) {
-  debug(`[REPLICATE] replicating...`)
   var stream = core1.replicate()
   stream.pipe(core2.replicate()).pipe(stream)
   stream.on('end', cb)
@@ -54,4 +51,4 @@ function replicate (core1, core2, cb) {
 
 function noop () {}
 
-module.exports = { cleanup, tmp, uniq, replicate, noop }
+module.exports = { cleanup, tmp, uniq, replicate }
