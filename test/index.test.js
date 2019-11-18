@@ -35,7 +35,7 @@ describe('basic', (context) => {
   context('perform a query', (assert, next) => {
     core.writer('local', (err, feed) => {
       feed.append(seeds, (err, _) => {
-        assert.error(err)
+        assert.error(err, 'no error')
 
         let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
@@ -54,12 +54,12 @@ describe('basic', (context) => {
   context('get all messages', (assert, next) => {
     core.writer('local', (err, feed) => {
       feed.append(seeds, (err, _) => {
-        assert.error(err)
+        assert.error(err, 'no error')
 
         let query = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
 
         core.ready('query', () => {
-          collect(core.api.query.read({ query }), (err, msgs) => {
+          collect(core.api.query.read({ reverse: true, query }), (err, msgs) => {
             var check = seeds
             assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
@@ -70,19 +70,61 @@ describe('basic', (context) => {
     })
   })
 
-  context('fil index', (assert, next) => {
+  context('fil index - get all changes to a specific file, then get all changes to all files', (assert, next) => {
     core.writer('local', (err, feed) => {
-      feed.append(seeds, (err, _) => {
-        assert.error(err)
-
-        let query = [{ $filter: { value: { filename: 'hello.txt', timestamp: { $gt: 0 } } } }]
+      feed.append(drive, (err, _) => {
+        assert.error(err, 'no error')
+        let filename = 'hello.txt'
+        let helloQuery = [{ $filter: { value: { filename, timestamp: { $gt: 0 } } } }]
 
         core.ready('query', () => {
-          collect(core.api.query.read({ query }), (err, msgs) => {
-            var check = drive
+          collect(core.api.query.read({ reverse: true, query: helloQuery }), (err, msgs) => {
+            var check = drive.filter((msg) => msg.filename === filename)
             assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
-            next()
+
+            let fileQuery = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
+
+            collect(core.api.query.read({ reverse: true, query: fileQuery }), (err, msgs) => {
+              var check = drive
+              assert.equal(msgs.length, check.length, 'gets the same number of messages')
+              assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+              next()
+            })
+          })
+        })
+      })
+    })
+  })
+
+  context('live', (assert, next) => {
+    core.writer('local', (err, feed) => {
+      assert.error(err, 'no error')
+      feed.append([seeds[0], seeds[1]], (err, _) => {
+        assert.error(err, 'no error')
+
+        let pending = seeds.length - 1
+        let count = 0
+        let query = [{ $filter: { value: { type: 'chat/message' } } }]
+
+        core.ready('query', () => {
+          var stream = core.api.query.read({ live: true, reverse: true, query })
+
+          stream.on('data', (msg) => {
+            assert.same(seeds[count], msg.value, 'streams each message live')
+            ++count
+            done()
+          })
+
+          function done (err) {
+            if (count === pending) {
+              stream.close()
+              return next()
+            }
+          }
+
+          feed.append([seeds[2], seeds[3], seeds[4]], (err, _) => {
+            assert.error(err, 'no error')
           })
         })
       })

@@ -1,9 +1,9 @@
 [
     {
         "type": "chat/message",
-        "timestamp": 1574069723313,
+        "timestamp": 1574069723314,
         "content": {
-            "body": "First message"
+          "body": "First message"
         }
     },
     {
@@ -15,21 +15,21 @@
     },
     {
         "type": "chat/message",
-        "timestamp": 1574069723316,
+        "timestamp": 1574069723317,
         "content": {
             "body": "Third message"
         }
     },
     {
         "type": "chat/message",
-        "timestamp": 1574069723315,
+        "timestamp": 1574069723316,
         "content": {
             "body": "Second message"
         }
     },
     {
         "type": "user/about",
-        "timestamp": 1574069723314,
+        "timestamp": 1574069723315,
         "content": {
             "name": "Poison Ivy"
         }

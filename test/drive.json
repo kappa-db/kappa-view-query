@@ -29,7 +29,8 @@
     "content": {
       "id": "7a79029efafacd6cfd84582417dae5c7a5b810af13b3f06d36b6df7945ec8ede",
       "seq": 2
-    },"timestamp": 1574089176032,
+    },
+    "timestamp": 1574089176032,
     "vectorClock": {
       "7c706b6a84e76c9646a1a54206f32ed918b52761bea048d2b4133c79908a75b9": 4
     }
@@ -52,6 +53,23 @@
     "vectorClock": {
       "3a64b9af72b27caad7a96203b527db3f5ab50584d932204f9984487d4693b30d": 8,
       "7c706b6a84e76c9646a1a54206f32ed918b52761bea048d2b4133c79908a75b9": 4
+    }
+  },
+  {
+    "filename": "test.txt",
+    "version": 2,
+    "links": [],
+    "metadata": {
+      "id": "3a64b9af72b27caad7a96203b527db3f5ab50584d932204f9984487d4693b30d",
+      "seq": 2
+    },
+    "content": {
+      "id": "2468a3c8704b538ab7e51daf1332ecd77b5bb843ba730c68606ddde2e1b6c74a",
+      "seq": 1
+    },
+    "timestamp": 1574089176047,
+    "vectorClock": {
+      "3a64b9af72b27caad7a96203b527db3f5ab50584d932204f9984487d4693b30d": 1
     }
   }
 ]
