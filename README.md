@@ -80,7 +80,7 @@ function validator (msg) {
 
 // Define a set of indexes under a namespace
 const indexes = [
-  { key: 'log', value: ['value', 'timestamp'] },
+  { key: 'log', value: [['value', 'timestamp']] },
   { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel']] }
 ]

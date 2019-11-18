@@ -11,7 +11,7 @@ const core = kappa(ram, { valueEncoding: 'json' })
 const db = memdb()
 
 const indexes = [
-  { key: 'log', value: ['value', 'timestamp'] },
+  { key: 'log', value: [['value', 'timestamp']] },
   { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
 ]
