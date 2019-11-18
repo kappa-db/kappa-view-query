@@ -8,6 +8,12 @@ const collect = require('collect-stream')
 const crypto = require('crypto')
 const debug = require('debug')('kappa-view-query')
 
+const seeds = require('./seeds.json')
+  .sort((a, b) => a.timestamp < b.timestamp ? +1 : -1)
+
+const drive = require('./drive.json')
+  .sort((a, b) => a.timestamp < b.timestamp ? +1 : -1)
+
 const { cleanup, tmp, replicate } = require('./util')
 
 describe('basic', (context) => {
@@ -17,46 +23,64 @@ describe('basic', (context) => {
     core = kappa(ram, { valueEncoding: 'json'  })
     db = memdb()
 
-    indexes = [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }]
+    indexes = [
+      { key: 'log', value: [['value', 'timestamp']] },
+      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
+      { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']] }
+    ]
 
     core.use('query', Query(db, { indexes }))
   })
 
   context('perform a query', (assert, next) => {
-    let data = [{
-      type: 'chat/message',
-      timestamp: Date.now(),
-      content: { body: 'First message' }
-    }, {
-      type: 'user/about',
-      timestamp: Date.now(),
-      content: { name: 'Grace' }
-    }, {
-      type: 'chat/message',
-      timestamp: Date.now() + 3,
-      content: { body: 'Third message' }
-    }, {
-      type: 'chat/message',
-      timestamp: Date.now() + 2,
-      content: { body: 'Second message' }
-    }, {
-      type: 'user/about',
-      timestamp: Date.now() + 1,
-      content: { name: 'Poison Ivy' }
-    }]
-
     core.writer('local', (err, feed) => {
-      feed.append(data, (err, _) => {
+      feed.append(seeds, (err, _) => {
         assert.error(err)
 
         let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
         core.ready('query', () => {
           collect(core.api.query.read({ reverse: true, query }), (err, msgs) => {
-            var check = data
-              .filter((msg) => msg.type === 'chat/message')
-              .sort((a, b) => a.timestamp < b.timestamp ? +1 : -1)
+            var check = seeds.filter((msg) => msg.type === 'chat/message')
 
+            assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+            next()
+          })
+        })
+      })
+    })
+  })
+
+  context('get all messages', (assert, next) => {
+    core.writer('local', (err, feed) => {
+      feed.append(seeds, (err, _) => {
+        assert.error(err)
+
+        let query = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
+
+        core.ready('query', () => {
+          collect(core.api.query.read({ query }), (err, msgs) => {
+            var check = seeds
+            assert.equal(msgs.length, check.length, 'gets the same number of messages')
+            assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+            next()
+          })
+        })
+      })
+    })
+  })
+
+  context('fil index', (assert, next) => {
+    core.writer('local', (err, feed) => {
+      feed.append(seeds, (err, _) => {
+        assert.error(err)
+
+        let query = [{ $filter: { value: { filename: 'hello.txt', timestamp: { $gt: 0 } } } }]
+
+        core.ready('query', () => {
+          collect(core.api.query.read({ query }), (err, msgs) => {
+            var check = drive
+            assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
             next()
           })

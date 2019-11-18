@@ -1,0 +1,37 @@
+[
+    {
+        "type": "chat/message",
+        "timestamp": 1574069723313,
+        "content": {
+            "body": "First message"
+        }
+    },
+    {
+        "type": "user/about",
+        "timestamp": 1574069723313,
+        "content": {
+            "name": "Grace"
+        }
+    },
+    {
+        "type": "chat/message",
+        "timestamp": 1574069723316,
+        "content": {
+            "body": "Third message"
+        }
+    },
+    {
+        "type": "chat/message",
+        "timestamp": 1574069723315,
+        "content": {
+            "body": "Second message"
+        }
+    },
+    {
+        "type": "user/about",
+        "timestamp": 1574069723314,
+        "content": {
+            "name": "Poison Ivy"
+        }
+    }
+]
