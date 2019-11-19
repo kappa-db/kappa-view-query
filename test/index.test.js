@@ -100,7 +100,7 @@ describe('basic', (context) => {
   context('live', (assert, next) => {
     core.writer('local', (err, feed) => {
       assert.error(err, 'no error')
-      feed.append([seeds[0], seeds[1]], (err, _) => {
+      feed.append(seeds.slice(0, 2), (err, _) => {
         assert.error(err, 'no error')
 
         let count = 0
@@ -117,7 +117,7 @@ describe('basic', (context) => {
             done()
           })
 
-          feed.append([seeds[2], seeds[3], seeds[4]], (err, _) => {
+          feed.append(seeds.slice(3, 5), (err, _) => {
             assert.error(err, 'no error')
           })
 
@@ -151,8 +151,12 @@ describe('multiple feeds', (context) => {
     var timestamp = Date.now()
     var count = 0
 
-    setup(name1, (feed1) => {
-      setup(name2, (feed2) => {
+    setup(name1, (err, feed1) => {
+      assert.error(err, 'no error')
+
+      setup(name2, (err, feed2) => {
+        assert.error(err, 'no error')
+
         debug(`initialised feed1: ${feed1.key.toString('hex')} feed2: ${feed2.key.toString('hex')}`)
         assert.same(2, core.feeds().length, 'two local feeds')
 
@@ -172,18 +176,101 @@ describe('multiple feeds', (context) => {
 
     function setup (name, cb) {
       core.writer(name, (err, feed) => {
-        assert.error(err, 'no error')
         feed.append({
           type: 'chat/message',
           timestamp: timestamp + count,
           content: { body: name }
         }, (err, seq) => {
-          assert.error(err, 'no error')
           count++
-          cb(feed)
+          cb(null, feed)
         })
       })
     }
+  })
+
+  context('aggregates all valid messages from all feeds, including those with colliding timestamps', (assert, next) => {
+    var query = [{ $filter: { value: { type: 'chat/message' } } }]
+    var timestamp = Date.now()
+
+    setup(name1, (err, feed1) => {
+      assert.error(err, 'no error')
+      setup(name2, (err, feed2) => {
+        assert.error(err, 'no error')
+
+        core.ready('query', () => {
+          collect(core.api.query.read({ query }), (err, msgs) => {
+            assert.error(err, 'no error')
+            assert.ok(msgs.length === 2, 'returns two messages')
+            assert.same(msgs, [
+              { key: feed1.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp, content: { body: name1 } } },
+              { key: feed2.key.toString('hex'), seq: 1, value: { type: 'chat/message', timestamp, content: { body: name2 } }}
+            ], 'aggregates all feeds')
+            next()
+          })
+        })
+      })
+    })
+
+    function setup (name, cb) {
+      core.writer(name1, (err, feed) => {
+        feed.append({
+          type: 'chat/message',
+          timestamp,
+          content: { body: name }
+        }, (err, seq) => {
+          cb(null, feed)
+        })
+      })
+    }
+  })
+
+  context('live', (assert, next) => {
+    var query = [{ $filter: { value: { type: 'chat/message' } } }]
+    let timestamp = Date.now()
+
+    core.writer(name1, (err, feed1) => {
+      assert.error(err, 'no error')
+
+      core.writer(name2, (err, feed2) => {
+        assert.error(err, 'no error')
+
+        let count = 0
+        let check = seeds
+          .map((msg) => Object.assign(msg, { timestamp }))
+          .filter((msg) => msg.type === 'chat/message')
+
+        // TODO: we have a race condition issue
+        // if we wrap this batch in core.ready('query')
+        // the first message appears to come through
+        // the query twice... once before sync: true,
+        // once after sync: true.
+        var batch1 = seeds.slice(0, 3)
+        feed1.append(batch1, (err, _) => {
+          assert.error(err, 'no error')
+        })
+
+        core.ready('query', () => {
+          var stream = core.api.query.read({ live: true, query })
+
+          stream.on('data', (msg) => {
+            assert.same(msg.value, check[count], 'streams each message live')
+            ++count
+            done()
+          })
+        })
+
+        core.ready('query', () => {
+          var batch2 = seeds.slice(3, 5)
+          feed2.append(batch2, (err, _) => {
+            assert.error(err, 'no error')
+          })
+        })
+
+        function done () {
+          if (count === check.length) return next()
+        }
+      })
+    })
   })
 })
 
