@@ -146,7 +146,7 @@ describe('multiple feeds', (context) => {
     core.use('query', Query(db, { indexes }))
   })
 
-  context('aggregates all valid messages from all feeds when querying', (assert, next) => {
+  context('aggregates all feeds', (assert, next) => {
     var query = [{ $filter: { value: { type: 'chat/message' } } }]
     var timestamp = Date.now()
     var count = 0
@@ -188,7 +188,7 @@ describe('multiple feeds', (context) => {
     }
   })
 
-  context('aggregates all valid messages from all feeds, including those with colliding timestamps', (assert, next) => {
+  context('aggregates all feeds, colliding timestamps', (assert, next) => {
     var query = [{ $filter: { value: { type: 'chat/message' } } }]
     var timestamp = Date.now()
 
@@ -241,9 +241,10 @@ describe('multiple feeds', (context) => {
 
         // TODO: we have a race condition issue
         // if we wrap this batch in core.ready('query')
-        // the first message appears to come through
+        // the first batch appears to come through
         // the query twice... once before sync: true,
-        // once after sync: true.
+        // once after sync: true, does this mean the query
+        // is being re-run after sync is true?
         var batch1 = seeds.slice(0, 3)
         feed1.append(batch1, (err, _) => {
           assert.error(err, 'no error')
@@ -293,29 +294,32 @@ describe('multiple cores', (context) => {
     var timestamp = Date.now()
     var count = 0
 
-    setup(core1, (feed1) => {
-      setup(core2, (feed2) => {
+    setup(core1, (err, feed1) => {
+      assert.error(err, 'no error')
+      setup(core2, (err, feed2) => {
+        assert.error(err, 'no error')
+
         debug(`initialised core1: ${feed1.key.toString('hex')} core2: ${feed2.key.toString('hex')}`)
         assert.same(1, core1.feeds().length, 'one feed')
         assert.same(1, core2.feeds().length, 'one feed')
 
         core1.ready('query', () => {
-          collect(core1.api.query.read({ query }), (err, msgs) => {
-            assert.error(err, 'no error')
-            assert.ok(msgs.length === 1, 'returns a single message')
-
-            replicate(core1, core2, (err) => {
+          core2.ready('query', () => {
+            collect(core1.api.query.read({ query }), (err, msgs) => {
               assert.error(err, 'no error')
-              assert.same(2, core1.feeds().length, `first core has second core's feed`)
-              assert.same(2, core2.feeds().length, `second core has first core's feed`)
+              assert.ok(msgs.length === 1, 'returns a single message')
 
-              core2.ready('query', () => {
+              replicate(core1, core2, (err) => {
+                assert.error(err, 'no error')
+                assert.same(2, core1.feeds().length, `first core has second core's feed`)
+                assert.same(2, core2.feeds().length, `second core has first core's feed`)
+
                 collect(core2.api.query.read({ query }), (err, msgs) => {
                   assert.error(err, 'no error')
                   assert.ok(msgs.length === 2, 'returns two messages')
                   assert.same(msgs, [
                     { key: feed1.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp } },
-                    { key: feed2.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp: timestamp + 1 } }
+                    { key: feed2.key.toString('hex'), seq: 0, value: { type: 'chat/message', timestamp: timestamp + 1} }
                   ], 'query aggregates messages from all feeds')
                   next()
                 })
@@ -328,16 +332,78 @@ describe('multiple cores', (context) => {
 
     function setup (kcore, cb) {
       kcore.writer('local', (err, feed) => {
-        assert.error(err, 'no error')
         feed.append({
           type: 'chat/message',
-          timestamp: timestamp + count
+          timestamp: timestamp + count,
         }, (err, seq) => {
-          count++
-          assert.error(err, 'no error')
-          cb(feed)
+          ++count
+          cb(null, feed)
         })
       })
+    }
+  })
+
+  context('live', (assert, next) => {
+    let query = [{ $filter: { value: { type: 'user/about' } } }]
+    let timestamp = Date.now()
+    let feed1Name = { type: 'user/about', timestamp, content: { name: 'Magpie' } }
+    let feed2Name = { type: 'user/about', timestamp, content: { name: 'Jackdaw' } }
+    let count1 = 0
+    let count2 = 0
+    let check1 = [feed1Name, feed2Name]
+    let check2 = [feed2Name, feed1Name]
+
+    setup(core1, (err, feed1) => {
+      assert.error(err, 'no error')
+
+      setup(core2, (err, feed2) => {
+        assert.error(err, 'no error')
+
+        core1.ready('query', () => {
+          let stream1 = core1.api.query.read({ live: true, query })
+
+          stream1.on('data', (msg) => {
+            console.log("STREAM1", msg)
+            assert.same(msg.value, check1[count1], 'streams each message live')
+            ++count1
+            done()
+          })
+
+          core2.ready('query', () => {
+            let stream2 = core2.api.query.read({ live: true, query })
+
+            stream2.on('data', (msg) => {
+              console.log("STREAM2", msg)
+              assert.same(msg.value, check2[count2], 'streams each message live')
+              ++count2
+              done()
+            })
+          })
+        })
+
+        feed1.append(feed1Name, (err, seq) => {
+          assert.error(err, 'no error')
+
+          feed2.append(feed2Name, (err, seq) => {
+            assert.error(err, 'no error')
+
+            console.log("REPLICATING")
+            replicate(core1, core2, (err) => {
+              assert.error(err, 'no error')
+              assert.same(2, core1.feeds().length, `first core has replicated second core's feed`)
+              assert.same(2, core2.feeds().length, `second core has replicated first core's feed`)
+            })
+          })
+        })
+      })
+    })
+
+    function done () {
+      if (count1 === 2 && count2 === 2) return next()
+    }
+
+    function setup (kcore, cb) {
+      kcore.writer('local', cb)
     }
   })
 })
