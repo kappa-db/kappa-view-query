@@ -9,10 +9,10 @@ const crypto = require('crypto')
 const debug = require('debug')('kappa-view-query')
 
 const seeds = require('./seeds.json')
-  .sort((a, b) => a.timestamp < b.timestamp ? +1 : -1)
+  .sort((a, b) => a.timestamp > b.timestamp ? +1 : -1)
 
 const drive = require('./drive.json')
-  .sort((a, b) => a.timestamp < b.timestamp ? +1 : -1)
+  .sort((a, b) => a.timestamp > b.timestamp ? +1 : -1)
 
 const { cleanup, tmp, replicate } = require('./util')
 
@@ -40,7 +40,7 @@ describe('basic', (context) => {
         let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
         core.ready('query', () => {
-          collect(core.api.query.read({ reverse: true, query }), (err, msgs) => {
+          collect(core.api.query.read({ query }), (err, msgs) => {
             var check = seeds.filter((msg) => msg.type === 'chat/message')
 
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
@@ -59,7 +59,7 @@ describe('basic', (context) => {
         let query = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
 
         core.ready('query', () => {
-          collect(core.api.query.read({ reverse: true, query }), (err, msgs) => {
+          collect(core.api.query.read({ query }), (err, msgs) => {
             var check = seeds
             assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
@@ -78,14 +78,14 @@ describe('basic', (context) => {
         let helloQuery = [{ $filter: { value: { filename, timestamp: { $gt: 0 } } } }]
 
         core.ready('query', () => {
-          collect(core.api.query.read({ reverse: true, query: helloQuery }), (err, msgs) => {
+          collect(core.api.query.read({ query: helloQuery }), (err, msgs) => {
             var check = drive.filter((msg) => msg.filename === filename)
             assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
 
             let fileQuery = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
 
-            collect(core.api.query.read({ reverse: true, query: fileQuery }), (err, msgs) => {
+            collect(core.api.query.read({ query: fileQuery }), (err, msgs) => {
               var check = drive
               assert.equal(msgs.length, check.length, 'gets the same number of messages')
               assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
@@ -103,29 +103,27 @@ describe('basic', (context) => {
       feed.append([seeds[0], seeds[1]], (err, _) => {
         assert.error(err, 'no error')
 
-        let pending = seeds.length - 1
         let count = 0
+        let check = seeds.filter((msg) => msg.type === 'chat/message')
+
         let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
         core.ready('query', () => {
-          var stream = core.api.query.read({ live: true, reverse: true, query })
+          var stream = core.api.query.read({ live: true, query })
 
           stream.on('data', (msg) => {
-            assert.same(seeds[count], msg.value, 'streams each message live')
+            assert.same(check[count], msg.value, 'streams each message live')
             ++count
             done()
           })
 
-          function done (err) {
-            if (count === pending) {
-              stream.close()
-              return next()
-            }
-          }
-
           feed.append([seeds[2], seeds[3], seeds[4]], (err, _) => {
             assert.error(err, 'no error')
           })
+
+          function done (err) {
+            if (count === check.length) return next()
+          }
         })
       })
     })
