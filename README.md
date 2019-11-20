@@ -167,7 +167,16 @@ $ npm install kappa-view-query
 ```
 
 ## Acknowledgments
-kappa-view-query was built by [@kyphae](https://github.com/kyphae/) and assisted by [@dominictarr](https://github.com/dominictarr). It uses [@dominictarr](https://github.com/dominictarr)'s scoring system and query interface.
+kappa-view-query was built by [@kyphae](https://github.com/kyphae/) and assisted by [@dominictarr](https://github.com/dominictarr). It uses [@dominictarr](https://github.com/dominictarr)'s scoring system and query interface from [flumeview-query](https://github.com/flumedb/flumeview-query).
 
-## Version Changes
-Version 2 - Updated to remove `pull-stream` and `flumeview-query` as a core dependency for better compatibility with the rest of the `kappa-db` ecosystem. `api.query.read` now returns a regular readable node stream. In order to continue to use pull-streams, check out an updated fork of V1: [kappa-view-pull-query](https://github.com/kappa-db/kappa-view-pull-query)
+## Releases
+### 2.0.0
+- Updated to remove the need for `pull-stream` and `flumeview-query` as an external dependency, providing better compatibility with the rest of the `kappa-db` ecosystem.
+- `core.api.query.read` returns a regular readable node stream.
+- In order to continue to use pull-streams:
+  - Use the updated fork of v1 at [kappa-view-pull-query](https://github.com/kappa-db/kappa-view-pull-query),
+  - Or make use of [stream-to-pull-stream](https://github.com/pull-stream/pull-stream-to-stream/).
+
+### 2.0.7
+- Fixed an outstanding issue where live streams were not working. Queries with `{ live: true }` setup will now properly pipe messages through as they are indexed.
+- Fixed an outstanding issue where messages with a matching timestamp were colliding, where the last indexed would over-writing the previous. Messages are now indexed, on top of provided values, on the sequence number and the feed id, for guaranteed uniqueness.
