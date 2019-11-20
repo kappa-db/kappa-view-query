@@ -3,6 +3,7 @@ const memdb = require('memdb')
 const charwise = require('charwise')
 const { EventEmitter } = require('events')
 const debug = require('debug')('kappa-view-query')
+const liveStream = require('level-live-stream')
 
 const Explain = require('./explain')
 const Filter = require('./filter')
@@ -34,7 +35,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
           if (indexKeys.length) {
             ops.push({
               type: 'put',
-              key: [idx.key, ...indexKeys],
+              key: [idx.key, ...indexKeys, msg.seq, msg.key],
               value: [msg.key, msg.seq].join('@'),
               keyEncoding,
             })
@@ -55,12 +56,14 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
         })
       })
 
-      debug(`[INDEXING] ${JSON.stringify(ops)}`)
+      debug(`indexing ${JSON.stringify(msgs, null, 2)} AS ${JSON.stringify(ops, null, 2)}`)
 
       db.batch(ops, next)
     },
     indexed: (msgs) => {
-      msgs.forEach((msg) => events.emit('update', msg))
+      msgs.forEach((msg) => {
+        events.emit('update', msg)
+      })
     },
     api: {
       read: (core, _opts) => {
@@ -73,6 +76,8 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
           exact: typeof idx.exact === 'boolean' ? idx.exact : false,
           createStream: (__opts) => {
             var thru = through.obj(function (msg, enc, next) {
+              if (msg.sync) return next()
+
               var msgId = msg.value
               var [ feedId, sequence ] = msgId.split('@')
               var feed = core._logs.feed(feedId)
@@ -80,20 +85,30 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
 
               feed.get(seq, (err, value) => {
                 if (err) return next()
-                var msg = validator({ key: feed.key.toString('hex'), seq, value })
+
+                var msg = validator({
+                  key: feed.key.toString('hex'),
+                  seq,
+                  value
+                })
+
                 if (!msg) return next()
                 this.push(msg)
                 next()
               })
             })
 
-            var stream = db.createReadStream(Object.assign(__opts, {
+            var streamOpts = Object.assign(__opts, {
               lte: [idx.key, ...__opts.lte],
               gte: [idx.key, ...__opts.gte],
               keyEncoding,
               keys: true,
               values: true
-            }))
+            })
+
+            var stream = __opts.live
+              ? liveStream(db, streamOpts)
+              : db.createReadStream(streamOpts)
 
             stream.pipe(thru)
 

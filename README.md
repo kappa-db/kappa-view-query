@@ -80,7 +80,7 @@ function validator (msg) {
 
 // Define a set of indexes under a namespace
 const indexes = [
-  { key: 'log', value: ['value', 'timestamp'] },
+  { key: 'log', value: [['value', 'timestamp']] },
   { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel']] }
 ]
@@ -171,8 +171,3 @@ kappa-view-query was built by [@kyphae](https://github.com/kyphae/) and assisted
 
 ## Version Changes
 Version 2 - Updated to remove `pull-stream` and `flumeview-query` as a core dependency for better compatibility with the rest of the `kappa-db` ecosystem. `api.query.read` now returns a regular readable node stream. In order to continue to use pull-streams, check out an updated fork of V1: [kappa-view-pull-query](https://github.com/kappa-db/kappa-view-pull-query)
-
-## Todos
-* [ ] write more comprehensive tests to ensure we're properly using map-filter-reduce
-* [ ] write tests for allowing different kinds of validators
-* [ ] make it so we can use multiple message schemas, and it selects the most appropriate schema based on the query

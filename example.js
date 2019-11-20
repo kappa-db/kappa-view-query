@@ -11,7 +11,7 @@ const core = kappa(ram, { valueEncoding: 'json' })
 const db = memdb()
 
 const indexes = [
-  { key: 'log', value: ['value', 'timestamp'] },
+  { key: 'log', value: [['value', 'timestamp']] },
   { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
   { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
 ]
@@ -25,23 +25,23 @@ core.writer('local', (err, feed) => {
     content: { body: 'Hi im new here...' }
   }, {
     type: 'user/about',
-    timestamp: Date.now() + 1,
+    timestamp: Date.now(),
     content: { name: 'Grace' }
   }, {
     type: 'chat/message',
-    timestamp: Date.now() + 2,
+    timestamp: Date.now(),
     content: { body: 'Second post' }
   }, {
     type: 'chat/message',
-    timestamp: Date.now() + 3,
+    timestamp: Date.now(),
     content: { channel: 'dogs', body: 'Lurchers rule' }
   }, {
     type: 'chat/message',
-    timestamp: Date.now() + 4,
+    timestamp: Date.now(),
     content: { channel: 'dogs', body: 'But sometimes I prefer labra-doodles' }
   }, {
     type: 'user/about',
-    timestamp: Date.now() + 5,
+    timestamp: Date.now(),
     content: { name: 'Poison Ivy' }
   }]
 
