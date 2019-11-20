@@ -239,19 +239,8 @@ describe('multiple feeds', (context) => {
           .map((msg) => Object.assign(msg, { timestamp }))
           .filter((msg) => msg.type === 'chat/message')
 
-        // TODO: we have a race condition issue
-        // if we wrap this batch in core.ready('query')
-        // the first batch appears to come through
-        // the query twice... once before sync: true,
-        // once after sync: true, does this mean the query
-        // is being re-run after sync is true?
-        var batch1 = seeds.slice(0, 3)
-        feed1.append(batch1, (err, _) => {
-          assert.error(err, 'no error')
-        })
-
         core.ready('query', () => {
-          var stream = core.api.query.read({ live: true, query })
+          var stream = core.api.query.read({ live: true, old: false, query })
 
           stream.on('data', (msg) => {
             assert.same(msg.value, check[count], 'streams each message live')
@@ -263,6 +252,13 @@ describe('multiple feeds', (context) => {
         core.ready('query', () => {
           var batch2 = seeds.slice(3, 5)
           feed2.append(batch2, (err, _) => {
+            assert.error(err, 'no error')
+          })
+        })
+
+        core.ready('query', () => {
+          var batch1 = seeds.slice(0, 3)
+          feed1.append(batch1, (err, _) => {
             assert.error(err, 'no error')
           })
         })
@@ -304,16 +300,16 @@ describe('multiple cores', (context) => {
         assert.same(1, core2.feeds().length, 'one feed')
 
         core1.ready('query', () => {
-          core2.ready('query', () => {
-            collect(core1.api.query.read({ query }), (err, msgs) => {
+          collect(core1.api.query.read({ query }), (err, msgs) => {
+            assert.error(err, 'no error')
+            assert.ok(msgs.length === 1, 'returns a single message')
+
+            replicate(core1, core2, (err) => {
               assert.error(err, 'no error')
-              assert.ok(msgs.length === 1, 'returns a single message')
+              assert.same(2, core1.feeds().length, `first core has second core's feed`)
+              assert.same(2, core2.feeds().length, `second core has first core's feed`)
 
-              replicate(core1, core2, (err) => {
-                assert.error(err, 'no error')
-                assert.same(2, core1.feeds().length, `first core has second core's feed`)
-                assert.same(2, core2.feeds().length, `second core has first core's feed`)
-
+              core2.ready('query', () => {
                 collect(core2.api.query.read({ query }), (err, msgs) => {
                   assert.error(err, 'no error')
                   assert.ok(msgs.length === 2, 'returns two messages')
@@ -358,43 +354,56 @@ describe('multiple cores', (context) => {
 
       setup(core2, (err, feed2) => {
         assert.error(err, 'no error')
+        let core1ready, core2ready
+
+        debug(`initialised core1: ${feed1.key.toString('hex')} core2: ${feed2.key.toString('hex')}`)
 
         core1.ready('query', () => {
-          let stream1 = core1.api.query.read({ live: true, query })
+          let stream1 = core1.api.query.read({ live: true, old: false, query })
 
           stream1.on('data', (msg) => {
-            console.log("STREAM1", msg)
+            debug(`stream 1: ${JSON.stringify(msg, null, 2)}` )
             assert.same(msg.value, check1[count1], 'streams each message live')
             ++count1
             done()
           })
 
-          core2.ready('query', () => {
-            let stream2 = core2.api.query.read({ live: true, query })
-
-            stream2.on('data', (msg) => {
-              console.log("STREAM2", msg)
-              assert.same(msg.value, check2[count2], 'streams each message live')
-              ++count2
-              done()
-            })
-          })
+          core1ready = true
+          doReplication()
         })
 
-        feed1.append(feed1Name, (err, seq) => {
-          assert.error(err, 'no error')
+        core2.ready('query', () => {
+          let stream2 = core2.api.query.read({ live: true, old: false, query })
 
-          feed2.append(feed2Name, (err, seq) => {
+          stream2.on('data', (msg) => {
+            debug(`stream 2: ${JSON.stringify(msg, null, 2)}` )
+            assert.same(msg.value, check2[count2], 'streams each message live')
+            ++count2
+            done()
+          })
+
+          core2ready = true
+          doReplication()
+        })
+
+        function doReplication () {
+          if (!(core1ready && core2ready)) return
+
+          feed1.append(feed1Name, (err, seq) => {
             assert.error(err, 'no error')
 
-            console.log("REPLICATING")
-            replicate(core1, core2, (err) => {
+            feed2.append(feed2Name, (err, seq) => {
               assert.error(err, 'no error')
-              assert.same(2, core1.feeds().length, `first core has replicated second core's feed`)
-              assert.same(2, core2.feeds().length, `second core has replicated first core's feed`)
+
+              debug('replicating')
+              replicate(core1, core2, (err) => {
+                assert.error(err, 'no error')
+                assert.same(2, core1.feeds().length, `first core has replicated second core's feed`)
+                assert.same(2, core2.feeds().length, `second core has replicated first core's feed`)
+              })
             })
           })
-        })
+        }
       })
     })
 

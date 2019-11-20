@@ -56,7 +56,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
         })
       })
 
-      debug(`[INDEXING] ${JSON.stringify(ops)}`)
+      debug(`indexing ${JSON.stringify(msgs, null, 2)} AS ${JSON.stringify(ops, null, 2)}`)
 
       db.batch(ops, next)
     },
