@@ -35,7 +35,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
           if (indexKeys.length) {
             ops.push({
               type: 'put',
-              key: [idx.key, ...indexKeys, msg.seq],
+              key: [idx.key, ...indexKeys, msg.seq, msg.key],
               value: [msg.key, msg.seq].join('@'),
               keyEncoding,
             })
