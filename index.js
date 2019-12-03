@@ -15,7 +15,6 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
 
   const {
     indexes = [],
-    validator = (msg) => msg,
     keyEncoding = charwise
   } = opts
 
@@ -26,10 +25,12 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
       var ops = []
 
       msgs.forEach((msg) => {
-        msg = validator(msg)
-        if (!msg) return
-
         indexes.forEach((idx) => {
+          if (idx.validator && typeof idx.validator === 'function') {
+            msg = idx.validator(msg)
+            if (!msg) return
+          }
+
           var indexKeys = getIndexValues(msg, idx.value)
 
           if (indexKeys.length) {
@@ -83,14 +84,19 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
               var feed = core._logs.feed(feedId)
               var seq = Number(sequence)
 
-              feed.get(seq, (err, value) => {
+              feed.get(seq, (err, payload) => {
                 if (err) return next()
 
-                var msg = validator({
+                if (idx.validator && typeof idx.validator === 'function') {
+                  payload = idx.validator(payload)
+                  if (!payload) return next()
+                }
+
+                var msg = {
                   key: feed.key.toString('hex'),
                   seq,
-                  value
-                })
+                  value: payload
+                }
 
                 if (!msg) return next()
                 this.push(msg)
@@ -128,6 +134,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
         events.on('update', cb)
       },
       storeState: (state, cb) => {
+        debug(state)
         state = state.toString('base64')
         db.put('state', state, cb)
       },
@@ -135,7 +142,10 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
         db.get('state', function (err, state) {
           if (err && err.notFound) cb()
           else if (err) cb(err)
-          else cb(null, Buffer.from(state, 'base64'))
+          else {
+            debug(state)
+            cb(null, Buffer.from(state, 'base64'))
+          }
         })
       },
       events

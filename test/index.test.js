@@ -17,22 +17,16 @@ const drive = require('./drive.json')
 const { cleanup, tmp, replicate } = require('./util')
 
 describe('basic', (context) => {
-  let core, db, indexes
-
-  context.beforeEach((c) => {
-    core = kappa(ram, { valueEncoding: 'json'  })
-    db = memdb()
-
-    indexes = [
+  context('perform a query', (assert, next) => {
+    let core = kappa(ram, { valueEncoding: 'json'  })
+    let db = memdb()
+    let indexes = [
       { key: 'log', value: [['value', 'timestamp']] },
       { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
       { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']] }
     ]
-
     core.use('query', Query(db, { indexes }))
-  })
 
-  context('perform a query', (assert, next) => {
     core.writer('local', (err, feed) => {
       feed.append(seeds, (err, _) => {
         assert.error(err, 'no error')
@@ -52,6 +46,15 @@ describe('basic', (context) => {
   })
 
   context('get all messages', (assert, next) => {
+    let core = kappa(ram, { valueEncoding: 'json'  })
+    let db = memdb()
+    let indexes = [
+      { key: 'log', value: [['value', 'timestamp']] },
+      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
+      { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']] }
+    ]
+    core.use('query', Query(db, { indexes }))
+
     core.writer('local', (err, feed) => {
       feed.append(seeds, (err, _) => {
         assert.error(err, 'no error')
@@ -71,6 +74,15 @@ describe('basic', (context) => {
   })
 
   context('fil index - get all changes to a specific file, then get all changes to all files', (assert, next) => {
+    let core = kappa(ram, { valueEncoding: 'json'  })
+    let db = memdb()
+    let indexes = [
+      { key: 'log', value: [['value', 'timestamp']] },
+      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
+      { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']] }
+    ]
+    core.use('query', Query(db, { indexes }))
+
     core.writer('local', (err, feed) => {
       feed.append(drive, (err, _) => {
         assert.error(err, 'no error')
@@ -98,6 +110,15 @@ describe('basic', (context) => {
   })
 
   context('live', (assert, next) => {
+    let core = kappa(ram, { valueEncoding: 'json'  })
+    let db = memdb()
+    let indexes = [
+      { key: 'log', value: [['value', 'timestamp']] },
+      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
+      { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']] }
+    ]
+    core.use('query', Query(db, { indexes }))
+
     core.writer('local', (err, feed) => {
       assert.error(err, 'no error')
       feed.append(seeds.slice(0, 2), (err, _) => {
@@ -127,6 +148,30 @@ describe('basic', (context) => {
         })
       })
     })
+  })
+
+  context('custom valueEncoding', (assert, next) => {
+    let core = kappa(ram, { valueEncoding: 'json'  })
+    let db = memdb()
+    let indexes = [
+      { key: 'log', value: [['value', 'timestamp']], validator },
+      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']], validator },
+      { key: 'fil', value: [['value', 'filename'], ['value', 'timestamp']], validator }
+    ]
+    core.use('query', Query(db, { indexes }))
+
+    core.writer('local', (err, feed) => {
+      assert.error(err, 'no error')
+      next()
+    })
+
+    function validator (msg) {
+      if (typeof msg !== 'object') return null
+      if (typeof msg.value !== 'object') return null
+      if (typeof msg.value.timestamp !== 'number') return null
+      if (typeof msg.value.type !== 'string') return null
+      return msg
+    }
   })
 })
 

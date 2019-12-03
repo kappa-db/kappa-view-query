@@ -10,13 +10,21 @@ const { cleaup, tmp } = require('./test/util')
 const core = kappa(ram, { valueEncoding: 'json' })
 const db = memdb()
 
+function valueEncoding (msg) {
+  if (typeof msg !== 'object') return null
+  if (typeof msg.value !== 'object') return null
+  if (typeof msg.value.timestamp !== 'number') return null
+  if (typeof msg.value.type !== 'string') return null
+  return msg
+}
+
 const indexes = [
-  { key: 'log', value: [['value', 'timestamp']] },
-  { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] },
-  { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']] }
+  { key: 'log', value: [['value', 'timestamp']], valueEncoding },
+  { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']], valueEncoding },
+  { key: 'cha', value: [['value', 'type'], ['value', 'content', 'channel'], ['value', 'timestamp']], valueEncoding }
 ]
 
-core.use('query', Query(db, { indexes, validator }))
+core.use('query', Query(db, { indexes }))
 
 core.writer('local', (err, feed) => {
   const data = [{
