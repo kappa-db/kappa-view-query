@@ -112,6 +112,7 @@ describe('basic', (context) => {
           var stream = core.api.query.read({ live: true, query })
 
           stream.on('data', (msg) => {
+            if (msg.sync) return done()
             assert.same(check[count], msg.value, 'streams each message live')
             ++count
             done()

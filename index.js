@@ -76,7 +76,10 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
           exact: typeof idx.exact === 'boolean' ? idx.exact : false,
           createStream: (__opts) => {
             var thru = through.obj(function (msg, enc, next) {
-              if (msg.sync) return next()
+              if (msg.sync) {
+                this.push(msg)
+                return next()
+              }
 
               var msgId = msg.value
               var [ feedId, sequence ] = msgId.split('@')
