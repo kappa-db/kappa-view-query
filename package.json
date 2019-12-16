@@ -1,8 +1,12 @@
 {
   "name": "kappa-view-query",
   "version": "2.0.9",
-  "description": "",
+  "description": "define your own indexes and execute map-filter-reduce queries over a set of hypercores using kappa-core",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kappa-db/kappa-view-query.git"
+  },
   "scripts": {
     "test": "tape test/**/*.test.js | tap-spec",
     "cover": "nyc tape test/**/*.test.js | tap-spec"
