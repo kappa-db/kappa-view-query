@@ -138,5 +138,4 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
       events.emit('update', msg)
     })
   }
-
 }

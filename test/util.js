@@ -43,10 +43,20 @@ function uniq (array) {
   return Array.from(new Set(array))
 }
 
-function replicate (core1, core2, cb) {
-  var stream = core1.replicate()
-  stream.pipe(core2.replicate()).pipe(stream)
-  stream.on('end', cb)
+function replicate (a, b, opts, cb) {
+  if (typeof opts === 'function') return replicate(a, b, {}, opts)
+  if (!cb) cb = noop
+
+  var s = a.replicate(true, Object.assign({ live: false }, opts))
+  var d = b.replicate(false, Object.assign({ live: false }, opts))
+
+  s.pipe(d).pipe(s)
+
+  s.on('error', (err) => {
+    if (err) return cb(err)
+  })
+
+  s.on('end', cb)
 }
 
 function noop () {}
