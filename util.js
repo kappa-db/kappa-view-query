@@ -53,8 +53,9 @@ function fromMultifeed (feeds, opts = {}) {
     var [ feedId, sequence ] = msgId.split('@')
     var feed = feeds.feed(feedId)
     var seq = Number(sequence)
+
     feed.get(seq, (err, value) => {
-      var msg = validator({
+      var msg = validate({
         key: feed.key.toString('hex'),
         seq,
         value
