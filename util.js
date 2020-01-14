@@ -50,11 +50,25 @@ function validator (msg) {
   return msg
 }
 
+function fromMultifeed (feeds) {
+  return function getFeed (msg, cb) {
+    var msgId = msg.value
+    var [ feedId, sequence ] = msgId.split('@')
+    var feed = feeds.feed(feedId)
+    var seq = Number(sequence)
+    return cb(null, { feed, seq })
+  }
+}
+
+function fromHypercore (feed) {
+}
+
 module.exports = {
   has,
   get,
   set,
   findByPath,
   isFunction,
-  validator
+  validator,
+  fromMultifeed
 }

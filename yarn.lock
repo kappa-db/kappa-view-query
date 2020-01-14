@@ -787,7 +787,7 @@ hypercore-protocol@^7.1.0, hypercore-protocol@^7.6.0:
     streamx "^2.1.0"
     timeout-refresh "^1.0.0"
 
-hypercore@^8.3.0:
+hypercore@^8.3.0, hypercore@^8.4.1:
   version "8.4.1"
   resolved "https://registry.yarnpkg.com/hypercore/-/hypercore-8.4.1.tgz#9f22457af7b570e942c1bd6a1ea8d64c1d74e3b5"
   integrity sha512-rsKnTIh+vklOByWZ+V9Rs5i0be7NwmxPQcUa8drRWEPQrRpl7i6WJJKwhDgNWk6M75d4ltt7Flryfp+76zMAzA==

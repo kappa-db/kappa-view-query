@@ -3,6 +3,7 @@ const Kappa = require('kappa-core')
 const createMultifeedSource = require('kappa-core/sources/multifeed')
 const createHypercoreSource = require('kappa-core/sources/hypercore')
 const multifeed = require('multifeed')
+const hypercore = require('hypercore')
 const ram = require('random-access-memory')
 const memdb = require('memdb')
 const sub = require('subleveldown')
@@ -13,51 +14,41 @@ const debug = require('debug')('kappa-view-query')
 
 const Query = require('../')
 
+const { fromMultifeed } = require('../util')
 const { cleanup, tmp, replicate } = require('./util')
 
 const seeds = require('./seeds.json').sort((a, b) => a.timestamp > b.timestamp ? +1 : -1)
 const drive = require('./drive.json').sort((a, b) => a.timestamp > b.timestamp ? +1 : -1)
 
-function initCore (core) {
-  return function fromSource (source, view) {
-    return function getFeed (msg, cb) {
-      var msgId = msg.value
-      var [ feedId, sequence ] = msgId.split('@')
-      var source = core.source[view]
-      var feed = source.feed(feedId)
-      var seq = Number(sequence)
-      return cb(null, { feed, seq })
-    }
-  }
-}
-
-describe('basic', (context) => {
+describe('hypercore', (context) => {
   context('perform a query', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
-    var feeds = multifeed(ram, { valueEncoding: 'json' })
+    var feed = hypercore(ram, { valueEncoding: 'json' })
     var db = memdb()
 
-    var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
+    var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: (msg, cb) => {
+        var msgId = msg.value
+        var [ feedId, sequence ] = msgId.split('@')
+        var seq = Number(sequence)
+        return cb(null, { feed, seq })
+      }
     }))
 
     core.ready('query', () => {
-      feeds.writer('local', (err, feed) => {
-        feed.append(seeds, (err, _) => {
-          assert.error(err, 'no error')
+      feed.append(seeds, (err, _) => {
+        assert.error(err, 'no error')
 
-          let query = [{ $filter: { value: { type: 'chat/message' } } }]
+        let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
-          core.ready('query', () => {
-            collect(core.view.query.read({ query }), (err, msgs) => {
-              var check = seeds.filter((msg) => msg.type === 'chat/message')
+        core.ready('query', () => {
+          collect(core.view.query.read({ query }), (err, msgs) => {
+            var check = seeds.filter((msg) => msg.type === 'chat/message')
 
-              assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
-              next()
-            })
+            assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+            next()
           })
         })
       })
@@ -66,25 +57,70 @@ describe('basic', (context) => {
 
   context('get all messages', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
-    var feeds = multifeed(ram, { valueEncoding: 'json' })
+    var feed = hypercore(ram, { valueEncoding: 'json' })
     var db = memdb()
 
-    var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
+    var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'log', value: [['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: (msg, cb) => {
+        var msgId = msg.value
+        var [ feedId, sequence ] = msgId.split('@')
+        var seq = Number(sequence)
+        return cb(null, { feed, seq })
+      }
     }))
 
-    feeds.writer('local', (err, feed) => {
-      feed.append(seeds, (err, _) => {
-        assert.error(err, 'no error')
+    feed.append(seeds, (err, _) => {
+      assert.error(err, 'no error')
 
-        let query = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
+      let query = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
 
-        core.ready('query', () => {
-          collect(core.view.query.read({ query }), (err, msgs) => {
-            var check = seeds
+      core.ready('query', () => {
+        collect(core.view.query.read({ query }), (err, msgs) => {
+          var check = seeds
+          assert.equal(msgs.length, check.length, 'gets the same number of messages')
+          assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+          next()
+        })
+      })
+    })
+  })
+
+  context('fil (used by cobox state feed)', (assert, next) => {
+    var core = new Kappa()
+    var feed = hypercore(ram, { valueEncoding: 'json' })
+    var db = memdb()
+
+    var source = createHypercoreSource({ feed, db: sub(db, 'state') })
+    core.use('query', source, Query(sub(db, 'view'), {
+      indexes: [
+        { key: 'log', value: [['value', 'timestamp']] },
+        { key: 'fil', value: [['value', 'filename']] },
+      ],
+      getFeed: (msg, cb) => {
+        var msgId = msg.value
+        var [ feedId, sequence ] = msgId.split('@')
+        var seq = Number(sequence)
+        return cb(null, { feed, seq })
+      }
+    }))
+
+    feed.append(drive, (err, _) => {
+      assert.error(err, 'no error')
+      let filename = 'hello.txt'
+      let helloQuery = [{ $filter: { value: { filename, timestamp: { $gt: 0 } } } }]
+
+      core.ready('query', () => {
+        collect(core.view.query.read({ query: helloQuery }), (err, msgs) => {
+          var check = drive.filter((msg) => msg.filename === filename)
+          assert.equal(msgs.length, check.length, 'gets the same number of messages')
+          assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
+
+          let fileQuery = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
+
+          collect(core.view.query.read({ query: fileQuery }), (err, msgs) => {
+            var check = drive
             assert.equal(msgs.length, check.length, 'gets the same number of messages')
             assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
             next()
@@ -94,103 +130,62 @@ describe('basic', (context) => {
     })
   })
 
-  context('fil (used by cobox state feed)', (assert, next) => {
-    var core = new Kappa()
-    var fromSource = initCore(core)
-    var feeds = multifeed(ram, { valueEncoding: 'json' })
-    var db = memdb()
-
-    var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
-    core.use('query', source, Query(sub(db, 'view'), {
-      indexes: [
-        { key: 'log', value: [['value', 'timestamp']] },
-        { key: 'fil', value: [['value', 'filename']] },
-      ],
-      getFeed: fromSource(source, 'query')
-    }))
-
-    feeds.writer('local', (err, feed) => {
-      feed.append(drive, (err, _) => {
-        assert.error(err, 'no error')
-        let filename = 'hello.txt'
-        let helloQuery = [{ $filter: { value: { filename, timestamp: { $gt: 0 } } } }]
-
-        core.ready('query', () => {
-          collect(core.view.query.read({ query: helloQuery }), (err, msgs) => {
-            var check = drive.filter((msg) => msg.filename === filename)
-            assert.equal(msgs.length, check.length, 'gets the same number of messages')
-            assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
-
-            let fileQuery = [{ $filter: { value: { timestamp: { $gt: 0 } } } }]
-
-            collect(core.view.query.read({ query: fileQuery }), (err, msgs) => {
-              var check = drive
-              assert.equal(msgs.length, check.length, 'gets the same number of messages')
-              assert.same(msgs.map((msg) => msg.value), check, 'querys messages using correct index')
-              next()
-            })
-          })
-        })
-      })
-    })
-  })
-
   context('live', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
-    var feeds = multifeed(ram, { valueEncoding: 'json' })
+    var feed = hypercore(ram, { valueEncoding: 'json' })
     var db = memdb()
 
-    var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
+    var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: (msg, cb) => {
+        var msgId = msg.value
+        var [ feedId, sequence ] = msgId.split('@')
+        var seq = Number(sequence)
+        return cb(null, { feed, seq })
+      }
     }))
 
-    feeds.writer('local', (err, feed) => {
+    feed.append(seeds.slice(0, 2), (err, _) => {
       assert.error(err, 'no error')
-      feed.append(seeds.slice(0, 2), (err, _) => {
-        assert.error(err, 'no error')
 
-        let count = 0
-        let check = seeds.filter((msg) => msg.type === 'chat/message')
+      let count = 0
+      let check = seeds.filter((msg) => msg.type === 'chat/message')
 
-        let query = [{ $filter: { value: { type: 'chat/message' } } }]
+      let query = [{ $filter: { value: { type: 'chat/message' } } }]
 
-        core.ready('query', () => {
-          var stream = core.view.query.read({ live: true, query })
+      core.ready('query', () => {
+        var stream = core.view.query.read({ live: true, query })
 
-          stream.on('data', (msg) => {
-            if (msg.sync) return done()
-            assert.same(check[count], msg.value, 'streams each message live')
-            ++count
-            done()
-          })
-
-          feed.append(seeds.slice(3, 5), (err, _) => {
-            assert.error(err, 'no error')
-          })
-
-          function done (err) {
-            if (count === check.length) return next()
-          }
+        stream.on('data', (msg) => {
+          if (msg.sync) return done()
+          assert.same(check[count], msg.value, 'streams each message live')
+          ++count
+          done()
         })
+
+        feed.append(seeds.slice(3, 5), (err, _) => {
+          assert.error(err, 'no error')
+        })
+
+        function done (err) {
+          if (count === check.length) return next()
+        }
       })
     })
   })
 })
 
-describe('multiple feeds', (context) => {
+describe('multifeed', (context) => {
   context('aggregates all feeds', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
     var feeds = multifeed(ram, { valueEncoding: 'json' })
     var db = memdb()
 
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -238,14 +233,13 @@ describe('multiple feeds', (context) => {
 
   context('aggregates all feeds, colliding timestamps', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
     var feeds = multifeed(ram, { valueEncoding: 'json' })
     var db = memdb()
 
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -287,14 +281,13 @@ describe('multiple feeds', (context) => {
 
   context('live', (assert, next) => {
     var core = new Kappa()
-    var fromSource = initCore(core)
     var feeds = multifeed(ram, { valueEncoding: 'json' })
     var db = memdb()
 
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource(source, 'query')
+      getFeed: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -345,30 +338,25 @@ describe('multiple feeds', (context) => {
   })
 })
 
-describe('multiple cores', (context) => {
+describe('multiple multifeeds', (context) => {
   context('aggregates all valid messages from all feeds when querying', (assert, next) => {
     var core1 = new Kappa()
     var core2 = new Kappa()
-
-    var fromSource1 = initCore(core1)
-    var fromSource2 = initCore(core2)
-
     var feeds1 = multifeed(ram, { valueEncoding: 'json' })
     var feeds2 = multifeed(ram, { valueEncoding: 'json' })
-
     var db1 = memdb()
     var db2 = memdb()
 
     var source1 = createMultifeedSource({ feeds: feeds1, db: sub(db1, 'state') })
     core1.use('query', source1, Query(sub(db1, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource1(source1, 'query')
+      getFeed: fromMultifeed(feeds1)
     }))
 
     var source2 = createMultifeedSource({ feeds: feeds2, db: sub(db2, 'state') })
     core2.use('query', source2, Query(sub(db2, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource2(source2, 'query')
+      getFeed: fromMultifeed(feeds2)
     }))
 
     var query = [{ $filter: { value: { type: 'chat/message' } } }]
@@ -427,26 +415,21 @@ describe('multiple cores', (context) => {
   context('live', (assert, next) => {
     var core1 = new Kappa()
     var core2 = new Kappa()
-
-    var fromSource1 = initCore(core1)
-    var fromSource2 = initCore(core2)
-
     var feeds1 = multifeed(ram, { valueEncoding: 'json' })
     var feeds2 = multifeed(ram, { valueEncoding: 'json' })
-
     var db1 = memdb()
     var db2 = memdb()
 
     var source1 = createMultifeedSource({ feeds: feeds1, db: sub(db1, 'state') })
     core1.use('query', source1, Query(sub(db1, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource1(source1, 'query')
+      getFeed: fromMultifeed(feeds1)
     }))
 
     var source2 = createMultifeedSource({ feeds: feeds2, db: sub(db2, 'state') })
     core2.use('query', source2, Query(sub(db2, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromSource2(source2, 'query')
+      getFeed: fromMultifeed(feeds2)
     }))
 
     let query = [{ $filter: { value: { type: 'user/about' } } }]
