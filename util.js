@@ -46,7 +46,7 @@ function validator (msg) {
 }
 
 function fromMultifeed (feeds, opts = {}) {
-  var validate = opts.validator || validator
+  var validate = opts.validator || function (msg) { return msg }
 
   return function getMessage (msg, cb) {
     var msgId = msg.value
@@ -67,7 +67,7 @@ function fromMultifeed (feeds, opts = {}) {
 }
 
 function fromHypercore (feed, opts = {}) {
-  var validate = opts.validator || validator
+  var validate = opts.validator || function (msg) { return msg }
 
   return function getMessage (msg, cb) {
     var msgId = msg.value
