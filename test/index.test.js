@@ -14,7 +14,7 @@ const debug = require('debug')('kappa-view-query')
 
 const Query = require('../')
 
-const { fromMultifeed } = require('../util')
+const { fromMultifeed, fromHypercore } = require('../util')
 const { cleanup, tmp, replicate } = require('./util')
 
 const seeds = require('./seeds.json').sort((a, b) => a.timestamp > b.timestamp ? +1 : -1)
@@ -29,12 +29,7 @@ describe('hypercore', (context) => {
     var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: (msg, cb) => {
-        var msgId = msg.value
-        var [ feedId, sequence ] = msgId.split('@')
-        var seq = Number(sequence)
-        return cb(null, { feed, seq })
-      }
+      getMessage: fromHypercore(feed)
     }))
 
     core.ready('query', () => {
@@ -63,12 +58,7 @@ describe('hypercore', (context) => {
     var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'log', value: [['value', 'timestamp']] }],
-      getFeed: (msg, cb) => {
-        var msgId = msg.value
-        var [ feedId, sequence ] = msgId.split('@')
-        var seq = Number(sequence)
-        return cb(null, { feed, seq })
-      }
+      getMessage: fromHypercore(feed)
     }))
 
     feed.append(seeds, (err, _) => {
@@ -98,12 +88,7 @@ describe('hypercore', (context) => {
         { key: 'log', value: [['value', 'timestamp']] },
         { key: 'fil', value: [['value', 'filename']] },
       ],
-      getFeed: (msg, cb) => {
-        var msgId = msg.value
-        var [ feedId, sequence ] = msgId.split('@')
-        var seq = Number(sequence)
-        return cb(null, { feed, seq })
-      }
+      getMessage: fromHypercore(feed)
     }))
 
     feed.append(drive, (err, _) => {
@@ -138,12 +123,7 @@ describe('hypercore', (context) => {
     var source = createHypercoreSource({ feed, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: (msg, cb) => {
-        var msgId = msg.value
-        var [ feedId, sequence ] = msgId.split('@')
-        var seq = Number(sequence)
-        return cb(null, { feed, seq })
-      }
+      getMessage: fromHypercore(feed)
     }))
 
     feed.append(seeds.slice(0, 2), (err, _) => {
@@ -185,7 +165,7 @@ describe('multifeed', (context) => {
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds)
+      getMessage: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -239,7 +219,7 @@ describe('multifeed', (context) => {
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds)
+      getMessage: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -287,7 +267,7 @@ describe('multifeed', (context) => {
     var source = createMultifeedSource({ feeds, db: sub(db, 'state') })
     core.use('query', source, Query(sub(db, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds)
+      getMessage: fromMultifeed(feeds)
     }))
 
     var name1 = crypto.randomBytes(16).toString('hex')
@@ -350,13 +330,13 @@ describe('multiple multifeeds', (context) => {
     var source1 = createMultifeedSource({ feeds: feeds1, db: sub(db1, 'state') })
     core1.use('query', source1, Query(sub(db1, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds1)
+      getMessage: fromMultifeed(feeds1)
     }))
 
     var source2 = createMultifeedSource({ feeds: feeds2, db: sub(db2, 'state') })
     core2.use('query', source2, Query(sub(db2, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds2)
+      getMessage: fromMultifeed(feeds2)
     }))
 
     var query = [{ $filter: { value: { type: 'chat/message' } } }]
@@ -423,13 +403,13 @@ describe('multiple multifeeds', (context) => {
     var source1 = createMultifeedSource({ feeds: feeds1, db: sub(db1, 'state') })
     core1.use('query', source1, Query(sub(db1, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds1)
+      getMessage: fromMultifeed(feeds1)
     }))
 
     var source2 = createMultifeedSource({ feeds: feeds2, db: sub(db2, 'state') })
     core2.use('query', source2, Query(sub(db2, 'view'), {
       indexes: [{ key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }],
-      getFeed: fromMultifeed(feeds2)
+      getMessage: fromMultifeed(feeds2)
     }))
 
     let query = [{ $filter: { value: { type: 'user/about' } } }]

@@ -4,11 +4,10 @@ const charwise = require('charwise')
 const { EventEmitter } = require('events')
 const debug = require('debug')('kappa-view-query')
 const liveStream = require('level-live-stream')
+const { isFunction } = require('util')
 
 const Explain = require('./explain')
 const Filter = require('./filter')
-
-const { isFunction } = require('./util')
 
 module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
   const events = new EventEmitter()
@@ -17,7 +16,7 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
     indexes = [],
     validator = (msg) => msg,
     keyEncoding = charwise,
-    getFeed,
+    getMessage,
   } = opts
 
   return {
@@ -43,22 +42,10 @@ module.exports = function KappaViewQuery (db = memdb(), opts = {}) {
             return next()
           }
 
-          getFeed(msg, (err, { feed, seq }) => {
+          getMessage(msg, (err, msg) => {
             if (err) return next()
-
-            feed.get(seq, (err, value) => {
-              if (err) return next()
-
-              var msg = validator({
-                key: feed.key.toString('hex'),
-                seq,
-                value
-              })
-
-              if (!msg) return next()
-              this.push(msg)
-              next()
-            })
+            this.push(msg)
+            next()
           })
         })
 
