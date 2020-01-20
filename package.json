@@ -1,6 +1,6 @@
 {
   "name": "kappa-view-query",
-  "version": "2.0.9",
+  "version": "3.0.0-alpha1",
   "description": "define your own indexes and execute map-filter-reduce queries over a set of hypercores using kappa-core",
   "main": "index.js",
   "repository": {
