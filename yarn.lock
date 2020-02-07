@@ -1005,13 +1005,23 @@ json-parse-better-errors@^1.0.1:
   resolved "https://registry.yarnpkg.com/json-parse-better-errors/-/json-parse-better-errors-1.0.2.tgz#bb867cfb3450e69107c131d1c514bab3dc8bcaa9"
   integrity sha512-mrqyZKfX5EhL7hvqcV6WG1yYjnjeuYDzDhhcAAUrq8Po85NBQBJP+ZDUT75qZQ98IkUoBqdkExkukOU7Ts2wrw==
 
-"kappa-core@github:Frando/kappa-core#kappa5-new":
+"kappa-core@github:Frando/kappa-core#exp-0.1.3":
   version "7.0.0-alpha1"
-  resolved "https://codeload.github.com/Frando/kappa-core/tar.gz/b1a6bbca502d0bf96733eb60d43b7c075d212375"
+  resolved "https://codeload.github.com/Frando/kappa-core/tar.gz/15777919bf820c7eaac6b76d1947cce93f922dac"
   dependencies:
     inherits "^2.0.4"
     stream-collector "^1.0.1"
     thunky "^1.1.0"
+
+"kappa-sparse-indexer@github:Frando/kappa-sparse-indexer#master":
+  version "0.4.0"
+  resolved "https://codeload.github.com/Frando/kappa-sparse-indexer/tar.gz/c49f3c8abbfe8a1c97c6001410e6949771343720"
+  dependencies:
+    debug "^4.1.1"
+    mutexify "^1.2.0"
+    pretty-hash "^1.0.1"
+    stream-collector "^1.0.1"
+    subleveldown "^4.1.4"
 
 last-one-wins@^1.0.4:
   version "1.0.4"

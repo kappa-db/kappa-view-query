@@ -1,16 +1,45 @@
 const Kappa = require('kappa-core')
-const multifeed = require('multifeed')
+const createHypercoreSource = require('kappa-core/sources/hypercore')
 const hypercore = require('hypercore')
 const ram = require('random-access-memory')
 const collect = require('collect-stream')
 const memdb = require('memdb')
 const sub = require('subleveldown')
 
-const Query = require('./')
-const { validator, fromMultifeed, fromHypercore } = require('./util')
-const { cleaup, tmp } = require('./test/util')
+const Query = require('../')
+const { validator, fromHypercore } = require('../util')
 
-const seedData = require('./test/seeds.json')
+const seedData = [{
+  type: "chat/message",
+  timestamp: 1574069723314,
+  content: {
+    body: "First message"
+  }
+}, {
+  type: "user/about",
+  timestamp: 1574069723313,
+  content: {
+    name: "Grace"
+  }
+}, {
+  type: "chat/message",
+  timestamp: 1574069723317,
+  content: {
+    body: "Third message"
+  }
+}, {
+  type: "chat/message",
+  timestamp: 1574069723316,
+  content: {
+    body: "Second message"
+  }
+},{
+  type: "user/about",
+  timestamp: 1574069723315,
+  content: {
+    name: "Poison Ivy"
+  }
+}]
 
 // An example using a single hypercore
 function HypercoreExample () {
@@ -49,20 +78,34 @@ function HypercoreExample () {
   })
 }
 
-// an example using multifeed for aggregating and querying all feeds
-function MultifeedExample () {
+// This example scopes the indexer to only use a chosen 'LOG' feed in our multifeed instance
+function MultifeedLimitedLogsWithSparseIndexer () {
   const core = new Kappa()
   const feeds = multifeed(ram, { valueEncoding: 'json' })
   const db = memdb()
+  const idx = Indexer({
+    db: sub(db, 'idx'),
+    name: 'example'
+  })
 
-  core.use('query', createMultifeedSource({ feeds, db: sub(db, 'state') }), Query(sub(db, 'view'), {
-    indexes: [
-      { key: 'log', value: [['value', 'timestamp']] },
-      { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }
-    ],
+  const header = Buffer.from('LOG')
+  feeds.on('feed', (feed) => {
+    idx.feed(feed.key) return
+    feed.get(0, (err, msg) => {
+      if (msg === header) idx.add(feed, { scan: true })
+    })
+  })
+
+  const indexes = [
+    { key: 'log', value: [['value', 'timestamp']] },
+    { key: 'typ', value: [['value', 'type'], ['value', 'timestamp']] }
+  ]
+  const view = Query(sub(db, 'view'), {
     validator,
     getMessage: fromMultifeed(feeds)
-  }))
+  })
+
+  core.use('query', idx.source(), view)
 
   core.ready('query', () => {
     // setup a live query to first log all chat/message
@@ -87,12 +130,15 @@ function MultifeedExample () {
     }
   })
 
-  // then append a bunch of data to two different feeds in a multifeed
-  feeds.writer('one', (err, one) => {
-    feeds.writer('two', (err, two) => {
-
-      one.append(seedData.slice(0, 3))
-      two.append(seedData.slice(3, 5))
+  // create our log feed, the one we want to index
+  feeds.writer('log', (err, log) => {
+    // create a second long, the one without the header
+    feeds.writer('ignore me', (err, ignore) => {
+      // append our header
+      log.append(header, (err, seq) => {
+        log.append(seedData.slice(0, 3))
+        ignore.append(seedData.slice(3, 5))
+      })
     })
   })
 }

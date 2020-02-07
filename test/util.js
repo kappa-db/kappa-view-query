@@ -33,7 +33,7 @@ function cleanup (dirs, cb) {
 }
 
 function tmp () {
-  var tmpDir = tmpdir().name
+  var tmpDir = './'+tmpdir().name
   mkdirp.sync(tmpDir)
   return tmpDir
 }
