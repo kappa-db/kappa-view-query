@@ -11,6 +11,10 @@ const Query = require('../')
 const { validator, fromMultifeed } = require('../util')
 const { tmp } = require('../test/util')
 
+// This example scopes the indexer to only use a chosen 'LOG' feed in our multifeed instance
+// When multifeed learns about a new feed, either using feed.writer, or when emitted on replication
+// our indexer will add the feed if it hasn't already, based on whether the first seq matches a specified header
+
 // Some dummy data
 const logMsgs = [{
   type: "user/about",
@@ -46,9 +50,7 @@ const ignoredMsgs = [{
   }
 }]
 
-// This example scopes the indexer to only use a chosen 'LOG' feed in our multifeed instance
-// When multifeed learns about a new feed, either using feed.writer, or when emitted on replication
-// our indexer will add the feed if it hasn't already, based on whether the first seq matches a specified header
+Example()
 
 function Example () {
   const core = new Kappa()
@@ -108,9 +110,9 @@ function Example () {
   }
 
   function setupQueries (callback) {
-    // setup a sync query to log all user/about
-
+    // make sure our indexes are ready before executing any queries
     core.ready('query', () => {
+      // setup a sync query to log all user/about
       collect(core.view.query.read({
         query: [{ $filter: { value: { type: 'user/about' } } }],
       }), (err, msgs) => {
@@ -148,5 +150,3 @@ function Example () {
     })
   }
 }
-
-Example()
