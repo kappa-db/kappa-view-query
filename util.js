@@ -38,16 +38,52 @@ function findByPath (indexes, path) {
   })
 }
 
-function isFunction (variable) {
-  return typeof variable === 'function'
-}
-
 function validator (msg) {
   if (typeof msg !== 'object') return null
   if (typeof msg.value !== 'object') return null
   if (typeof msg.value.timestamp !== 'number') return null
-  if (typeof msg.value.type !== 'string') return null
   return msg
+}
+
+function fromMultifeed (feeds, opts = {}) {
+  var validate = opts.validator || function (msg) { return msg }
+
+  return function getMessage (msg, cb) {
+    var msgId = msg.value
+    var [ feedId, sequence ] = msgId.split('@')
+    var feed = feeds.feed(feedId)
+    var seq = Number(sequence)
+
+    feed.get(seq, (err, value) => {
+      var msg = validate({
+        key: feed.key.toString('hex'),
+        seq,
+        value
+      })
+      if (!msg) return cb(new Error('message failed to validate'))
+      return cb(null, msg)
+    })
+  }
+}
+
+function fromHypercore (feed, opts = {}) {
+  var validate = opts.validator || function (msg) { return msg }
+
+  return function getMessage (msg, cb) {
+    var msgId = msg.value
+    var sequence = msgId.split('@')[1]
+    var seq = Number(sequence)
+
+    feed.get(seq, (err, value) => {
+      var msg = validate({
+        key: feed.key.toString('hex'),
+        seq,
+        value
+      })
+      if (!msg) return cb(new Error('message failed to validate'))
+      return cb(null, msg)
+    })
+  }
 }
 
 module.exports = {
@@ -55,6 +91,7 @@ module.exports = {
   get,
   set,
   findByPath,
-  isFunction,
-  validator
+  validator,
+  fromMultifeed,
+  fromHypercore
 }
